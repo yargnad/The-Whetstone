@@ -82,7 +82,7 @@ The Whetstone is a **physical AI device** that acts as a Socratic interlocutor�
 
 ### What's Working (Laptop Prototype)
 
-The `philosopher_jan_app.py` script demonstrates:
+The `philosopher_app.py` script demonstrates:
 
 1. ✅ **Multi-persona system** with library filtering
 2. ✅ **Local Ollama integration** (Mistral 7B via OpenAI-compatible API)
@@ -170,7 +170,7 @@ pip install openai
 #### 5. Run The Whetstone
 
 ```bash
-python philosopher_jan_app.py
+python philosopher_app.py
 ```
 
 #### 6. Select Persona and Start Dialogue
@@ -305,7 +305,7 @@ Then yes. This is a **tool for life**, not a monthly SaaS fee.
 
 ### Q: Can I add my own philosophy texts?
 
-**A:** Yes! Simply add `.txt` files to the `philosophy_library/` directory. You can also create custom personas with library filters in `philosopher_jan_app.py`.
+**A:** Yes! Simply add `.txt` files to the `philosophy_library/` directory. You can also create custom personas with library filters in `philosopher_app.py`.
 
 ### Q: Will this work on other ARM boards?
 
