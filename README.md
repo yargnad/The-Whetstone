@@ -331,6 +331,20 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (coming soon).
 
 ---
 
+## Part of The Authentic Rebellion Framework
+
+The Whetstone is **Act II** of a four-act movement for building ethical AI infrastructure:
+
+- **Act I: Sensus** ([GitHub](https://github.com/yargnad/sensus-app)) — Anonymous emotional exchange to escape the Performance Prison
+- **Act II: The Whetstone** (this project) — Physical AI device for Socratic cognitive strengthening
+- ***The Interlude: The Crystalizer*** ([GitHub](https://github.com/yargnad/The-Crystalizer)) — Chrome extension for preserving AI conversations when platforms fail you
+- **Act III: Kintsugi** ([GitHub](https://github.com/yargnad/Kintsugi)) — Public gallery for transformation stories
+- **Act IV: The Lyceum Network** ([GitHub](https://github.com/yargnad/The-Lyceum)) — Decentralized mesh network for sovereign infrastructure
+
+**[📖 Read the full Framework documentation](https://rebellion.musubiaccord.org)**
+
+---
+
 ## License
 
 **GNU General Public License v3.0**
