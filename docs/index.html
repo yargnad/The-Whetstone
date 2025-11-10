@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Whetstone - Cognitive Strengthening</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 20px; }
+        .container { max-width: 800px; background: white; border-radius: 15px; box-shadow: 0 20px 60px rgba(0,0,0,0.3); overflow: hidden; }
+        header { background: linear-gradient(135deg, #2d3748 0%, #1a202c 100%); color: white; padding: 60px 40px; text-align: center; }
+        header h1 { font-size: 3em; margin-bottom: 15px; font-weight: 300; letter-spacing: 3px; }
+        header .tagline { font-size: 1.3em; opacity: 0.9; font-style: italic; margin-bottom: 10px; }
+        header .subtitle { font-size: 0.9em; opacity: 0.7; margin-top: 20px; }
+        main { padding: 50px 40px; }
+        .description { font-size: 1.1em; text-align: center; margin-bottom: 40px; color: #4a5568; line-height: 1.8; }
+        .status { text-align: center; margin: 30px 0; padding: 20px; background: #fff5f5; border-left: 5px solid #fc8181; border-radius: 5px; }
+        .status h3 { color: #c53030; margin-bottom: 10px; }
+        .features { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 30px; margin: 50px 0; }
+        .feature { text-align: center; padding: 25px; background: #f7fafc; border-radius: 10px; border-top: 4px solid #667eea; }
+        .feature h3 { color: #667eea; margin-bottom: 10px; font-size: 1.1em; }
+        .feature p { color: #4a5568; font-size: 0.95em; line-height: 1.6; }
+        .quote { font-style: italic; font-size: 1.2em; color: #4a5568; text-align: center; padding: 30px; margin: 40px 0; background: #f7fafc; border-left: 5px solid #667eea; border-radius: 5px; }
+        .links { display: flex; justify-content: center; gap: 20px; margin-top: 40px; flex-wrap: wrap; }
+        .links a { padding: 12px 25px; background: #f7fafc; color: #667eea; text-decoration: none; border-radius: 8px; border: 2px solid #667eea; transition: all 0.3s; font-weight: 500; }
+        .links a:hover { background: #667eea; color: white; transform: translateY(-2px); }
+        footer { background: #2d3748; color: white; padding: 30px; text-align: center; }
+        footer p { margin: 8px 0; opacity: 0.8; font-size: 0.9em; }
+        footer a { color: #667eea; text-decoration: none; }
+        footer a:hover { text-decoration: underline; }
+        .badge { display: inline-block; margin-top: 15px; }
+        @media (max-width: 600px) {
+            header h1 { font-size: 2em; }
+            header .tagline { font-size: 1.1em; }
+            .features { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>The Whetstone</h1>
+            <p class="tagline">Cognitive Strengthening</p>
+            <p class="subtitle">Part of The Authentic Rebellion Framework</p>
+        </header>
+        <main>
+            <p class="description">
+                A physical AI device that acts as a Socratic interlocutor—challenging assumptions, 
+                exposing contradictions, and helping you reason toward clarity about your beliefs and values.
+            </p>
+            <div class="status">
+                <h3>🔨 Hardware Ordered - In Development</h3>
+                <p>Currently building the prototype. Documentation and code will be released as open-source hardware/software.</p>
+            </div>
+            <div class="features">
+                <div class="feature">
+                    <h3>🏠 Privacy by Architecture</h3>
+                    <p>Local-first AI. Your conversations never leave your device.</p>
+                </div>
+                <div class="feature">
+                    <h3>📍 Presence Over Portability</h3>
+                    <p>It stays in one place. You go to it intentionally, like journaling.</p>
+                </div>
+                <div class="feature">
+                    <h3>🧠 Philosophical Immune System</h3>
+                    <p>Built-in ethical guardrails that challenge your reasoning.</p>
+                </div>
+                <div class="feature">
+                    <h3>👑 Digital Sovereignty</h3>
+                    <p>You own it. Can't be remotely disabled or paywalled.</p>
+                </div>
+            </div>
+            <div class="quote">
+                "Not an app, but a physical object that creates ritual. 
+                Like having a Socratic philosopher in your home, dedicated to sharpening your thinking."
+            </div>
+            <div class="links">
+                <a href="https://github.com/yargnad/The-Whetstone" target="_blank">📦 GitHub Repository</a>
+                <a href="https://rebellion.musubiaccord.org" target="_blank">📖 The Framework</a>
+            </div>
+        </main>
+        <footer>
+            <p><strong>The Whetstone</strong> is Act II of <a href="https://rebellion.musubiaccord.org" target="_blank">The Authentic Rebellion Framework</a></p>
+            <p>A four-act movement for building ethical AI infrastructure</p>
+            <div class="badge">
+                <a href="https://www.gnu.org/licenses/gpl-3.0" target="_blank">
+                    <img src="https://img.shields.io/badge/License-GPLv3-blue.svg" alt="License: GPL v3">
+                </a>
+            </div>
+            <p style="margin-top: 20px; font-size: 0.85em; opacity: 0.7;">
+                Open-source • Forkable • Ungovernable • Built for cognitive sovereignty
+            </p>
+        </footer>
+    </div>
+</body>
+</html>
