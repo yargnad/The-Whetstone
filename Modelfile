@@ -1,0 +1,6 @@
+# This Modelfile tells Ollama how to configure our custom model
+FROM mistral
+
+# Offload all possible layers to the GPU
+# For a 7B model on a 6GB+ GPU, '99' is a good way to say "all of them"
+PARAMETER num_gpu 99

@@ -1,0 +1,5 @@
+model_path: llamacpp/models/Mistral-7B-Instruct-v0_3_Q4_K_M/model.gguf
+model_sha256: 14850c84ff9f06e9b51d505d64815d5cc0cea0257380353ac0b3d21b21f6e024
+model_size_bytes: 4372811936
+name: Mistral-7B-Instruct-v0_3_Q4_K_M
+size_bytes: 4372811936
