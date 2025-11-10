@@ -335,7 +335,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines (coming soon).
 
 The Whetstone is **Act II** of a four-act movement for building ethical AI infrastructure:
 
-- **Act I: Sensus** ([GitHub](https://github.com/yargnad/sensus-app)) — Anonymous emotional exchange to escape the Performance Prison
+- **Act I: Sensus** ([GitHub](https://github.com/yargnad/Sensus)) — Anonymous emotional exchange to escape the Performance Prison
 - **Act II: The Whetstone** (this project) — Physical AI device for Socratic cognitive strengthening
 - ***The Interlude: The Crystalizer*** ([GitHub](https://github.com/yargnad/The-Crystalizer)) — Chrome extension for preserving AI conversations when platforms fail you
 - **Act III: Kintsugi** ([GitHub](https://github.com/yargnad/Kintsugi)) — Public gallery for transformation stories
