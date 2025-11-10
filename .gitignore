@@ -1,0 +1,38 @@
+# Large model files (download separately)
+*.gguf
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+*.egg-info/
+dist/
+build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.log
+temp_recording.wav
+output.wav
+
+# RKNN models (NPU-specific, large files)
+*.rknn
+
+# TTS models (download separately)
+*.onnx
+*.onnx.json
