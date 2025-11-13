@@ -357,7 +357,7 @@ See [LICENSE](LICENSE) for full text.
 
 ## Links
 
-- **The Authentic Rebellion Framework**: [yargnad.github.io/Authentic-Rebellion-Framework](https://yargnad.github.io/Authentic-Rebellion-Framework/)
+- **The Authentic Rebellion Framework**: [rebellion.musubiaccord.org](https://rebellion.musubiaccord.org)
 - **The Musubi Accord (Steward Organization)**: [musubiaccord.org](https://musubiaccord.org)
 - **Ollama**: [ollama.com](https://ollama.com)
 - **Radxa Rock 5B+**: [radxa.com](https://radxa.com/products/rock5/5bplus/)
