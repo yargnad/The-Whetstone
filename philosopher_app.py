@@ -5,14 +5,47 @@
 #              to be restricted to a specific set of texts in the library.
 
 
+
 import os
 import glob
 import logging
 import json
+import subprocess
+import sys
+import time
+import socket
 from openai import OpenAI
 
 # --- Configuration ---
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# --- Ollama Server Auto-Launch ---
+def is_ollama_running(host="127.0.0.1", port=11434):
+    try:
+        with socket.create_connection((host, port), timeout=1):
+            return True
+    except Exception:
+        return False
+
+def launch_ollama_server():
+    print("[INFO] Ollama server not detected. Launching 'ollama serve' with 16k context window...")
+    env = os.environ.copy()
+    env["OLLAMA_CONTEXT_LENGTH"] = "16384"
+    if sys.platform.startswith("win"):
+        # Windows: creationflags=DETACHED_PROCESS
+        DETACHED_PROCESS = 0x00000008
+        subprocess.Popen(["ollama", "serve"], creationflags=DETACHED_PROCESS, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+    else:
+        # Unix: start new session
+        subprocess.Popen(["ollama", "serve"], start_new_session=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)
+    # Wait for server to be ready
+    for _ in range(30):
+        if is_ollama_running():
+            print("[INFO] Ollama server is now running.")
+            return
+        time.sleep(1)
+    print("[ERROR] Ollama server did not start within 30 seconds. Please check your installation.")
+    sys.exit(1)
 
 
 # --- Persona Config ---
@@ -231,5 +264,7 @@ def main():
             print("Invalid selection. Please try again.")
 
 if __name__ == "__main__":
+    if not is_ollama_running():
+        launch_ollama_server()
     main()
 

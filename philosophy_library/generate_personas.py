@@ -75,7 +75,7 @@ def sample_text_for_author(files, max_chars=1200, deep_scan=False):
             continue
     # For deep scan, cap the total text length and sample from start, middle, and end for diversity
     if deep_scan:
-        max_deep_chars = 8000  # Increased for maximum LLM context coverage
+        max_deep_chars = 5000  # Further reduced to help prevent LLM input truncation
         if len(text) <= max_deep_chars:
             return text
         # Sample: first 1/3, middle 1/3, last 1/3 (each ~max_deep_chars//3)
@@ -108,13 +108,13 @@ def generate_meta_prompt(author, sample_text):
                     {"role": "system", "content": style_system},
                     {"role": "user", "content": style_user}
                 ],
-                max_tokens=600,  # Increased to allow longer summaries
+                max_tokens=1200,  # Increased to allow much longer summaries
                 temperature=0.7
             )
             style_summary = response.choices[0].message.content.strip()
             if style_summary and len(style_summary) > 40:
-                if len(style_summary) > 550:
-                    print(f"[WARN] Style summary for {author} may be truncated (length: {len(style_summary)} chars, max_tokens=600). Consider increasing max_tokens if needed.")
+                if len(style_summary) > 1100:
+                    print(f"[WARN] Style summary for {author} may be truncated (length: {len(style_summary)} chars, max_tokens=1200). Consider increasing max_tokens if needed.")
                 break
         except Exception as e:
             print(f"[WARN] LLM style summary failed for {author}: {e}")
@@ -149,13 +149,13 @@ def generate_meta_prompt(author, sample_text):
                     {"role": "system", "content": prompt_system},
                     {"role": "user", "content": prompt_user}
                 ],
-                max_tokens=600,  # Increased to allow longer persona prompts
+                max_tokens=1200,  # Increased to allow much longer persona prompts
                 temperature=0.7
             )
             result = response.choices[0].message.content.strip()
             print(f"[DEBUG] Raw LLM output for {author}:\n{result}\n---")
-            if len(result) > 550:
-                print(f"[WARN] Persona prompt for {author} may be truncated (length: {len(result)} chars, max_tokens=600). Consider increasing max_tokens if needed.")
+            if len(result) > 1100:
+                print(f"[WARN] Persona prompt for {author} may be truncated (length: {len(result)} chars, max_tokens=1200). Consider increasing max_tokens if needed.")
             if not result or len(result) < 40:
                 print(f"[WARN] Persona prompt for {author} is suspiciously short (length: {len(result)}). Retrying...")
                 continue
