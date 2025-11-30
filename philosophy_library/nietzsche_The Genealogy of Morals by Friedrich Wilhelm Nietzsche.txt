@@ -382,7 +382,7 @@ rumination.
 Sils-Maria, Upper Engadine, July 1887.
 
 
-
+---BEGIN AUTHOR TEXT---
 
 FIRST ESSAY. "GOOD AND EVIL," "GOOD AND BAD."
 
@@ -5053,7 +5053,7 @@ fundamental conditions of life, but it is and remains _a will_!--and
 to say at the end that which I said at the beginning--man will wish
 _Nothingness_ rather than not wish _at all_.
 
-
+---END AUTHOR TEXT---
 
 [1] An allusion to the celebrated monologue in William Tell.
 

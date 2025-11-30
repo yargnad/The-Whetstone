@@ -1,7 +1,8 @@
-﻿Apology
-By Plato
+﻿Title: Apology
 
+Author: Plato
 
+---BEGIN AUTHOR TEXT---
 Socrates' Defense
 
 How you have felt, O men of Athens, at hearing the speeches of my
@@ -978,3 +979,4 @@ The hour of departure has arrived, and we go our ways - I to die,
 and you to live. Which is better God only knows. 
 
 THE END
+---END AUTHOR TEXT---

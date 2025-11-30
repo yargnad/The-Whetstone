@@ -642,7 +642,7 @@ around many a difficulty.
                         H. L. MENCKEN.
 
 
-
+---BEGIN AUTHOR TEXT---
 
 PREFACE
 
@@ -3413,7 +3413,7 @@ last?_--_From today?_--The transvaluation of all values!...
 
 
 THE END
-
+---END AUTHOR TEXT---
 
 
 

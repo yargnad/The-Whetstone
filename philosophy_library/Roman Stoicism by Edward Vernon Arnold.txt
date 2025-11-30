@@ -242,7 +242,7 @@ CONTENTS
 
 
 
-
+---BEGIN AUTHOR TEXT---
 CHAPTER I.
 
 THE WORLD-RELIGIONS.
@@ -20714,7 +20714,7 @@ anything in excess of this comes from the Evil one[160].’ To the simple
 and the straightforward, who trust themselves because they trust a power
 higher than themselves, the future belongs.
 
-
+---END AUTHOR TEXT---
 FOOTNOTES
 
 [1] As to supposed instances to the contrary see Winckler, _Stoicismus_,

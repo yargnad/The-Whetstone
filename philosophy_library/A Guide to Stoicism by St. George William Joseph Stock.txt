@@ -72,7 +72,7 @@ the Stoic doctrine based on the original authorities.
 
          ST GEORGE STOCK
 
-
+---BEGIN AUTHOR TEXT---
 PHILOSOPHY AMONG THE GREEKS AND ROMANS.
 
 Among the Greeks and Romans of the classical age philosophy occupied
@@ -1758,6 +1758,7 @@ her work in educating the world and the world was beginning to make
 payment in kind. Those who had been branded as natural slaves were
 now giving laws to philosophy. The kingdom of wisdom was suffering
 violence at the hands of barbarians.
+---END AUTHOR TEXT---
 
 
 

@@ -148,7 +148,7 @@ knows? THE GOAL TO AIM AT....
 Sils Maria Upper Engadine, JUNE, 1885.
 
 
-
+---BEGIN AUTHOR TEXT---
 
 CHAPTER I. PREJUDICES OF PHILOSOPHERS
 
@@ -6142,7 +6142,7 @@ Translated by L. A. Magnus
      And Light and Dark were one that wedding-morn.
 
 
-
+---END AUTHOR TEXT---
 
 
 

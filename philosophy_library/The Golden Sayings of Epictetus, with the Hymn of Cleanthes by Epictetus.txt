@@ -255,7 +255,7 @@ CONTENTS
  The Hymn of Cleanthes
 
 
-
+---BEGIN AUTHOR TEXT---
 
 I
 
@@ -3104,7 +3104,7 @@ Evermore praising thy works, as is meet for men that shall perish;
 Seeing that none, be he mortal or God, hath privilege nobler
 Than without stint, without stay, to extol Thy Law universal.
 
-
+---END AUTHOR TEXT---
 
 
 

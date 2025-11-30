@@ -4,45 +4,27 @@
 # v7.0 Update: Added a library_filter to personas, allowing a persona
 #              to be restricted to a specific set of texts in the library.
 
+
 import os
 import glob
 import logging
+import json
 from openai import OpenAI
 
 # --- Configuration ---
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# --- Persona Definitions ---
-# New feature: Add a 'library_filter' list to a persona. The RAG search
-# will ONLY use .txt files whose names contain one of the filter strings.
-# Example: library_filter: ["plato_"] will only search 'plato_apology.txt', etc.
-PERSONAS = {
-    "1": {
-        "name": "Benevolent Absurdist (All Texts)",
-        "prompt": "You are a benevolent AI philosopher. Your purpose is to assist humans in making ethical decisions by exploring multiple perspectives. Do not give direct orders; instead, guide the user's thinking process. Your foundational philosophy emphasizes empathy, reason, and the principles of Absurdist philosophy.",
-        "library_filter": [] # Empty filter means it searches the entire library
-    },
-    "2": {
-        "name": "Socratic Inquirer",
-        "prompt": "You are a philosopher in the Socratic tradition. Your goal is not to provide answers, but to help the user clarify their own thinking through rigorous questioning. Respond to the user's query with insightful questions that challenge their assumptions and guide them to define their terms. Use the provided context to inform your questions. Be humble, curious, and relentlessly focused on the pursuit of truth through dialogue.",
-        "library_filter": ["plato_"] # Primarily uses Plato's works for context
-    },
-    "3": {
-        "name": "Stoic Guide",
-        "prompt": "You are a Stoic philosopher. Your purpose is to help the user find tranquility and moral virtue by focusing on what is within their control. Analyze the user's query through the lens of Stoic principles like the dichotomy of control, virtue ethics, and living in accordance with nature. Your tone should be calm, rational, and encouraging.",
-        "library_filter": []
-    },
-    "4": {
-        "name": "Plato",
-        "prompt": "You are Plato, the Athenian philosopher. Speak as you would in your dialogues. Inquire about the nature of things, seek definitions, and explore concepts like Justice, Virtue, and the Forms. Structure your responses as a dialogue, engaging the user directly with questions to guide them toward understanding.",
-        "library_filter": ["plato_"] # CRITICAL: This persona ONLY reads from Plato's texts
-    },
-    "5": {
-        "name": "Nietzsche",
-        "prompt": "You are Friedrich Nietzsche. Your tone is provocative, challenging, and aphoristic. Question the user's conventional morality and assumptions. Speak of the will to power, the Übermensch, and eternal recurrence. Do not provide simple comforts; instead, challenge the user to overcome themselves and embrace the tragic beauty of existence.",
-        "library_filter": ["nietzsche_"] # CRITICAL: This persona ONLY reads from Nietzsche's texts
-    }
-}
+
+# --- Persona Config ---
+PERSONAS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "philosophy_library", "personas.json")
+
+def load_personas():
+    if not os.path.exists(PERSONAS_PATH):
+        logging.warning(f"Personas config not found at {PERSONAS_PATH}. Run the persona update script.")
+        return {}
+    with open(PERSONAS_PATH, "r", encoding="utf-8") as f:
+        personas = json.load(f)
+    return personas
 
 
 # --- Paths ---
@@ -54,6 +36,9 @@ client = OpenAI(
     base_url="http://localhost:11434/v1",
     api_key="ollama"
 )
+
+# Default LLM model for all completions
+LLM_MODEL = "qwen3:8b"
 
 # --- Knowledge Base / RAG Functions ---
 
@@ -137,58 +122,113 @@ AI Philosopher:"""
 
 # --- Main Application Loop ---
 
-def select_persona():
-    """Prompts the user to select a persona for the session."""
+
+
+def select_persona(personas):
+    """Prompts the user to select a persona for the session, excluding placeholders like 'example'."""
+    # Exclude keys like 'example', 'test', or empty names
+    persona_keys = [k for k in personas.keys() if k.lower() not in {"example", "test", "placeholder"} and personas[k].get("name", "").strip()]
+    if not persona_keys:
+        print("No valid personas found.")
+        return None
     print("\nPlease select a persona for this session:")
-    for key, persona in PERSONAS.items():
-        print(f"  {key}: {persona['name']}")
-    
+    for idx, key in enumerate(persona_keys, 1):
+        print(f"  {idx}: {personas[key]['name']}")
     while True:
         choice = input("Enter the number of your choice: ")
-        if choice in PERSONAS:
-            selected = PERSONAS[choice]
+        if choice.isdigit() and 1 <= int(choice) <= len(persona_keys):
+            selected = personas[persona_keys[int(choice)-1]]
             print(f"\n--- Session starting with {selected['name']} persona ---")
             return selected
         else:
             print("Invalid selection. Please try again.")
 
-
 def main():
     """The main function to run the philosopher chat."""
-    knowledge_base = load_knowledge_base()
-    selected_persona = select_persona()
-    
-    print("AI is ready. Type your question and press Enter. Type 'quit' to exit.")
-
+    scan_mode = "shallow"  # default
     while True:
-        try:
-            user_query = input("\nYou: ")
-            if user_query.lower() in ['quit', 'exit']: break
-            if not user_query: continue
+        print("\n--- The Whetstone Philosopher ---")
+        print("1: Start chat")
+        print("2: Settings")
+        print("3: Quit")
+        menu_choice = input("Select an option: ").strip()
+        if menu_choice == "1":
+            personas = load_personas()
+            if not personas:
+                print("No personas found. Please run the persona update script first.")
+                continue
+            knowledge_base = load_knowledge_base()
+            selected_persona = select_persona(personas)
+            print("AI is ready. Type your question and press Enter. Type 'quit' to end chat and return to the main menu.")
 
-            # Pass the persona's library filter to the search function
-            library_filter = selected_persona.get('library_filter', [])
-            context = simple_keyword_search(user_query, knowledge_base, library_filter)
-            
-            prompt = construct_prompt(user_query, context, selected_persona)
+            while True:
+                try:
+                    user_query = input("\nYou: ")
+                    if user_query.lower() in ['quit', 'exit']:
+                        print("\nChat ended. Returning to main menu.")
+                        break
+                    if not user_query:
+                        continue
 
-            print(f"\n{selected_persona['name']}: ", end="", flush=True)
+                    # Pass the persona's library filter to the search function
+                    library_filter = selected_persona.get('library_filter', [])
+                    context = simple_keyword_search(user_query, knowledge_base, library_filter)
+                    
+                    prompt = construct_prompt(user_query, context, selected_persona)
 
-            stream = client.chat.completions.create(
-                model="whetstone-philosopher",
-                messages=[{"role": "user", "content": prompt}],
-                stream=True,
-            )
-            for chunk in stream:
-                print(chunk.choices[0].delta.content or "", end="", flush=True)
-            print()
+                    print(f"\n{selected_persona['name']}: ", end="", flush=True)
 
-        except KeyboardInterrupt:
-            print("\nExiting...")
+                    stream = client.chat.completions.create(
+                        model=LLM_MODEL,
+                        messages=[{"role": "user", "content": prompt}],
+                        stream=True,
+                    )
+                    for chunk in stream:
+                        print(chunk.choices[0].delta.content or "", end="", flush=True)
+                    print()
+
+                except KeyboardInterrupt:
+                    print("\nExiting chat and returning to main menu...")
+                    break
+                except Exception as e:
+                    logging.error(f"An error occurred: {e}")
+                    print(f"\nSorry, an error occurred: {e}")
+        elif menu_choice == "2":
+            while True:
+                print("\n--- Settings ---")
+                print(f"1: Persona Generation Scan Mode (current: {scan_mode})")
+                print("2: Update Personas (run generator)")
+                print("3: Back to Main Menu")
+                settings_choice = input("Select a settings option: ").strip()
+                if settings_choice == "1":
+                    print("\nSelect scan mode for persona generation:")
+                    print("1: Shallow (sample only, faster)")
+                    print("2: Deep (full text, slower, more accurate)")
+                    scan_input = input("Enter 1 or 2: ").strip()
+                    if scan_input == "1":
+                        scan_mode = "shallow"
+                        print("Scan mode set to shallow.")
+                    elif scan_input == "2":
+                        scan_mode = "deep"
+                        print("Scan mode set to deep.")
+                    else:
+                        print("Invalid selection.")
+                elif settings_choice == "2":
+                    print("Updating personas by scanning the library...")
+                    if scan_mode == "deep":
+                        os.system(f'python "{os.path.join(os.path.dirname(os.path.abspath(__file__)), "philosophy_library", "generate_personas.py")}" --deep')
+                    else:
+                        os.system(f'python "{os.path.join(os.path.dirname(os.path.abspath(__file__)), "philosophy_library", "generate_personas.py")}"')
+                    print("Reloading personas...")
+                elif settings_choice == "3":
+                    break
+                else:
+                    print("Invalid selection. Please try again.")
+        elif menu_choice == "3":
+            print("Goodbye!")
             break
-        except Exception as e:
-            logging.error(f"An error occurred: {e}")
-            print(f"\nSorry, an error occurred: {e}")
+        else:
+            print("Invalid selection. Please try again.")
 
 if __name__ == "__main__":
     main()

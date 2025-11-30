@@ -573,7 +573,7 @@ thou have them always in a readiness.
 
 
 THE FIRST BOOK
-
+---BEGIN AUTHOR TEXT---
 
 I. Of my grandfather Verus I have learned to be gentle and meek, and to
 refrain from all anger and passion. From the fame and memory of him that
@@ -5727,7 +5727,7 @@ cause of thy dissolution. As for thyself; thou hast to do with
 neither. Go thy ways then well pleased and contented: for so is He that
 dismisseth thee.
 
-
+---END AUTHOR TEXT---
 
 
 APPENDIX
