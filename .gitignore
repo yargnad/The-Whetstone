@@ -30,6 +30,10 @@ Thumbs.db
 temp_recording.wav
 output.wav
 
+# Project test/output artifacts
+deep-scan-persona-test-output.md
+ollama-ui-test.md
+
 # RKNN models (NPU-specific, large files)
 *.rknn
 
