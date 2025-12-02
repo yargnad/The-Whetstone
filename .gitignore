@@ -30,6 +30,9 @@ Thumbs.db
 temp_recording.wav
 output.wav
 
+# Windows development helpers
+philosopher.bat
+
 # Project test/output artifacts
 deep-scan-persona-test-output.md
 ollama-ui-test.md

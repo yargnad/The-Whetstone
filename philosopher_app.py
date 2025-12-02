@@ -248,10 +248,13 @@ def main():
                         print("Invalid selection.")
                 elif settings_choice == "2":
                     print("Updating personas by scanning the library...")
+                    script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "philosophy_library", "generate_personas.py")
+                    cmd = [sys.executable, script_path]
                     if scan_mode == "deep":
-                        os.system(f'python "{os.path.join(os.path.dirname(os.path.abspath(__file__)), "philosophy_library", "generate_personas.py")}" --deep')
-                    else:
-                        os.system(f'python "{os.path.join(os.path.dirname(os.path.abspath(__file__)), "philosophy_library", "generate_personas.py")}"')
+                        cmd.append("--deep")
+                    result = subprocess.run(cmd, cwd=os.path.dirname(script_path))
+                    if result.returncode != 0:
+                        print(f"[ERROR] Persona generation failed with exit code {result.returncode}")
                     print("Reloading personas...")
                 elif settings_choice == "3":
                     break
