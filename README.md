@@ -21,6 +21,7 @@ The Whetstone is a **physical AI device** that acts as a Socratic interlocutorâ€
 To democratize cognitive sovereignty, The Whetstone is available in two hardware tiers:
 
 ### 1. The Whetstone Core (The Companion)
+
 * **Role:** The "Socratic Alarm Clock." A dedicated, always-on philosophical companion.
 * **Hardware:** **Radxa Dragon Q6A** (Qualcomm QCS6490).
 * **AI Model:** **Qwen 3 8B** (Quantized w4a16 & NPU-Accelerated).
@@ -29,6 +30,7 @@ To democratize cognitive sovereignty, The Whetstone is available in two hardware
 * **Vibe:** "Passive Provocation." It waits for you to engage or subtly signals via LED when it has a thought.
 
 ### 2. The Whetstone Pro (The Oracle)
+
 * **Role:** The Archive & Research Station. A heavy-duty private server for deep RAG and journal analysis.
 * **Hardware:** **Radxa Rock 5B+** (24GB RAM).
 * **AI Model:** **Qwen 3 14B / 32B** (Full Precision).
@@ -54,6 +56,7 @@ The Whetstone does not rely on hard-coded personalities. **The AI becomes what i
 ## Hardware Specifications
 
 ### Core Kit (Radxa Dragon Q6A)
+
 -   **SoC:** Qualcomm QCS6490 (8-core Kryo CPU + **12 TOPS Hexagon NPU**)
 -   **RAM:** 8GB LPDDR5 (Required for Qwen 3 8B @ 4-bit)
 -   **Storage:** 64GB eMMC or NVMe
@@ -61,6 +64,7 @@ The Whetstone does not rely on hard-coded personalities. **The AI becomes what i
 -   **Est. Cost:** ~$130 (Board + Case + Mic)
 
 ### Pro Kit (Radxa Rock 5B+)
+
 -   **SoC:** Rockchip RK3588 (8-core ARM + 6 TOPS NPU)
 -   **RAM:** 24GB LPDDR4x
 -   **Storage:** 1TB NVMe SSD (for massive RAG databases)
@@ -85,17 +89,22 @@ The Whetstone Core implements a **Functional Air Gap**:
 ## Deployment Guide
 
 ### For Whetstone Core (Dragon Q6A)
+
 *We provide a pre-built OS image. No manual software installation required.*
+
 1.  Download the latest `WhetstoneOS_Core_vX.img`.
 2.  Flash to SD Card or NVMe using BalenaEtcher.
 3.  Boot. The device is immediately active.
 
 ### For Whetstone Pro (Rock 5B+)
+
 1.  Install Armbian or Ubuntu 22.04.
 2.  Run the setup script:
+
     ```bash
     curl -fsSL [https://raw.githubusercontent.com/yargnad/The-Whetstone/main/install_pro.sh](https://raw.githubusercontent.com/yargnad/The-Whetstone/main/install_pro.sh) | sh
     ```
+
 3.  Access the web interface at `http://whetstone.local:8080` to configure personas.
 
 ---
