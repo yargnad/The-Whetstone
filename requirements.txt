@@ -14,6 +14,9 @@ openai>=1.0.0          # OpenAI-compatible API client for Ollama
 # chromadb>=0.4.0       # Vector database for semantic search
 # sentence-transformers>=2.2.0  # Embeddings model
 
+# Socratic Scheduler
+schedule>=1.2.0
+
 # Future: Voice Integration (Phase 3)
 # pyaudio>=0.2.11       # Audio I/O
 # numpy>=1.24.0         # Audio processing
