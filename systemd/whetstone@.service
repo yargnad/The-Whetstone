@@ -1,0 +1,32 @@
+[Unit]
+Description=The Whetstone - Socratic AI Companion (Pro Edition)
+Documentation=https://github.com/yargnad/The-Whetstone
+After=network.target ollama.service
+Wants=ollama.service
+
+[Service]
+Type=simple
+User=%i
+WorkingDirectory=/home/%i/The-Whetstone
+
+# Environment configuration
+Environment="WHETSTONE_MODEL=qwen3:14b"
+Environment="OLLAMA_CONTEXT_LENGTH=32768"
+Environment="PYTHONUNBUFFERED=1"
+
+# Main application
+ExecStart=/home/%i/The-Whetstone/venv/bin/python3 /home/%i/The-Whetstone/philosopher_app.py
+
+# Restart policy
+Restart=on-failure
+RestartSec=10
+StartLimitBurst=3
+StartLimitIntervalSec=60
+
+# Security hardening
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/%i/The-Whetstone
+
+[Install]
+WantedBy=multi-user.target

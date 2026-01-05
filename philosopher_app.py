@@ -1,6 +1,8 @@
 # The Whetstone Project - Orchestrator Script
-# Version 7.0 - The Ollama Edition (Persona-Specific RAG)
+# Version 8.0 - Multi-Backend Edition (Ollama + llama.cpp)
 # -----------------------------------------
+# v8.0 Update: Added support for both Ollama and llama-cpp-python backends.
+#              Configure via WHETSTONE_BACKEND environment variable.
 # v7.0 Update: Added a library_filter to personas, allowing a persona
 #              to be restricted to a specific set of texts in the library.
 
@@ -14,7 +16,8 @@ import subprocess
 import sys
 import time
 import socket
-from openai import OpenAI
+
+from backends import create_backend, OllamaBackend
 
 # --- Configuration ---
 logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -64,14 +67,13 @@ def load_personas():
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 KNOWLEDGE_BASE_PATH = os.path.join(PROJECT_DIR, "philosophy_library")
 
-# --- Connect to the Ollama Server ---
-client = OpenAI(
-    base_url="http://localhost:11434/v1",
-    api_key="ollama"
-)
-
-# Default LLM model for all completions
-LLM_MODEL = "qwen3:8b"
+# --- Backend Configuration ---
+# Supports both Ollama and llama.cpp backends
+# Configure via environment variables:
+#   WHETSTONE_BACKEND: "ollama" (default) or "llamacpp"
+#   WHETSTONE_MODEL: Model name for Ollama (default: qwen3:14b)
+#   WHETSTONE_MODEL_PATH: Path to GGUF file for llama.cpp
+backend = None  # Initialized in main()
 
 # --- Knowledge Base / RAG Functions ---
 
@@ -126,9 +128,17 @@ def simple_keyword_search(query, documents, library_filter, num_results=3):
     logging.info(f"Found {len(scored_docs)} relevant snippets for the query.")
     return scored_docs[:num_results]
 
-def construct_prompt(query, context_snippets, selected_persona):
+def construct_prompt(query, context_snippets, selected_persona, deep_mode=False):
     """Constructs the final prompt for the LLM, using the selected persona."""
     persona_prompt = selected_persona["prompt"]
+    
+    # Concise mode for e-ink displays and better UX
+    # deep_mode enables longer, more thorough responses
+    verbose = deep_mode or os.getenv("WHETSTONE_VERBOSE", "0") == "1"
+    if verbose:
+        length_instruction = "\n\nProvide a thoughtful, thorough response. Take your time to explore the question deeply."
+    else:
+        length_instruction = "\n\nIMPORTANT: Keep your response concise - 2-3 sentences maximum. Be direct and insightful, not exhaustive."
 
     if context_snippets:
         context_str = "\n\n---\n\n".join(
@@ -142,13 +152,13 @@ Here is some context from your library that may be relevant to the user's query:
 {context_str}
 ---
 
-Now, carefully consider the user's question and respond in character, grounding your response in the provided texts.
+Now, carefully consider the user's question and respond in character, grounding your response in the provided texts.{length_instruction}
 User's Question: {query}
 AI Philosopher:"""
     else:
         prompt_template = f"""{persona_prompt}
 
-Carefully consider the user's question and respond in character.
+Carefully consider the user's question and respond in character.{length_instruction}
 User's Question: {query}
 AI Philosopher:"""
     return prompt_template
@@ -179,8 +189,10 @@ def select_persona(personas):
 def main():
     """The main function to run the philosopher chat."""
     scan_mode = "shallow"  # default
+    deep_mode = False  # Concise by default, toggle with /deep
     while True:
-        print("\n--- The Whetstone Philosopher ---")
+        mode_indicator = "🔍 DEEP" if deep_mode else "⚡ QUICK"
+        print(f"\n--- The Whetstone Philosopher [{mode_indicator}] ---")
         print("1: Start chat")
         print("2: Settings")
         print("3: Quit")
@@ -192,14 +204,21 @@ def main():
                 continue
             knowledge_base = load_knowledge_base()
             selected_persona = select_persona(personas)
-            print("AI is ready. Type your question and press Enter. Type 'quit' to end chat and return to the main menu.")
+            print("AI is ready. Type your question and press Enter.")
+            print("Commands: 'quit' to exit, '/deep' to toggle deep reasoning mode")
 
             while True:
                 try:
-                    user_query = input("\nYou: ")
+                    mode_tag = "[DEEP] " if deep_mode else ""
+                    user_query = input(f"\n{mode_tag}You: ")
                     if user_query.lower() in ['quit', 'exit']:
                         print("\nChat ended. Returning to main menu.")
                         break
+                    if user_query.lower() == '/deep':
+                        deep_mode = not deep_mode
+                        status = "ON - longer, thorough responses" if deep_mode else "OFF - concise 2-3 sentences"
+                        print(f"\n🔄 Deep reasoning mode: {status}")
+                        continue
                     if not user_query:
                         continue
 
@@ -207,17 +226,12 @@ def main():
                     library_filter = selected_persona.get('library_filter', [])
                     context = simple_keyword_search(user_query, knowledge_base, library_filter)
                     
-                    prompt = construct_prompt(user_query, context, selected_persona)
+                    prompt = construct_prompt(user_query, context, selected_persona, deep_mode)
 
                     print(f"\n{selected_persona['name']}: ", end="", flush=True)
 
-                    stream = client.chat.completions.create(
-                        model=LLM_MODEL,
-                        messages=[{"role": "user", "content": prompt}],
-                        stream=True,
-                    )
-                    for chunk in stream:
-                        print(chunk.choices[0].delta.content or "", end="", flush=True)
+                    for token in backend.generate(prompt, stream=True):
+                        print(token, end="", flush=True)
                     print()
 
                 except KeyboardInterrupt:
@@ -228,12 +242,18 @@ def main():
                     print(f"\nSorry, an error occurred: {e}")
         elif menu_choice == "2":
             while True:
+                mode_str = "ON" if deep_mode else "OFF"
                 print("\n--- Settings ---")
-                print(f"1: Persona Generation Scan Mode (current: {scan_mode})")
-                print("2: Update Personas (run generator)")
-                print("3: Back to Main Menu")
+                print(f"1: Deep Reasoning Mode (current: {mode_str})")
+                print(f"2: Persona Generation Scan Mode (current: {scan_mode})")
+                print("3: Update Personas (run generator)")
+                print("4: Back to Main Menu")
                 settings_choice = input("Select a settings option: ").strip()
                 if settings_choice == "1":
+                    deep_mode = not deep_mode
+                    status = "ON - longer, thorough responses" if deep_mode else "OFF - concise 2-3 sentences"
+                    print(f"Deep reasoning mode: {status}")
+                elif settings_choice == "2":
                     print("\nSelect scan mode for persona generation:")
                     print("1: Shallow (sample only, faster)")
                     print("2: Deep (full text, slower, more accurate)")
@@ -246,7 +266,7 @@ def main():
                         print("Scan mode set to deep.")
                     else:
                         print("Invalid selection.")
-                elif settings_choice == "2":
+                elif settings_choice == "3":
                     print("Updating personas by scanning the library...")
                     script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "philosophy_library", "generate_personas.py")
                     cmd = [sys.executable, script_path]
@@ -256,7 +276,7 @@ def main():
                     if result.returncode != 0:
                         print(f"[ERROR] Persona generation failed with exit code {result.returncode}")
                     print("Reloading personas...")
-                elif settings_choice == "3":
+                elif settings_choice == "4":
                     break
                 else:
                     print("Invalid selection. Please try again.")
@@ -267,7 +287,16 @@ def main():
             print("Invalid selection. Please try again.")
 
 if __name__ == "__main__":
-    if not is_ollama_running():
-        launch_ollama_server()
+    # Initialize backend based on configuration
+    backend_type = os.getenv("WHETSTONE_BACKEND", "ollama").lower()
+    
+    if backend_type == "ollama":
+        # Auto-launch Ollama server if needed
+        if not is_ollama_running():
+            launch_ollama_server()
+    
+    print(f"[INFO] Initializing {backend_type} backend...")
+    backend = create_backend()
+    print(f"[INFO] Backend ready: {backend.name}")
+    
     main()
-

@@ -16,8 +16,8 @@ client = OpenAI(
     api_key="ollama"
 )
 
-# Default LLM model for all completions
-LLM_MODEL = "qwen3:8b"
+# Default LLM model - configurable via environment variable
+LLM_MODEL = os.getenv("WHETSTONE_MODEL", "qwen3:14b")
 
 
 def normalize_author_name(name):
