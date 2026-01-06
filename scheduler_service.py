@@ -75,7 +75,8 @@ You are "poking" the user to wake them up from their daily routine.
 Generate a sudden, short, 1-sentence {poke_type} insight.
 Do not say "Hello". Just deliver the insight like a lightning bolt.
 """
-        response = self.core.backend.generate(prompt)
+        response_gen = self.core.backend.generate(prompt, stream=False)
+        response = "".join(list(response_gen))
 
         # 4. Deliver (Currently just Print + Log)
         self._deliver_payload(persona['name'], response)
