@@ -64,17 +64,31 @@ Screen {
 }
 
 /* Chat Bubbles */
+/* Chat Bubbles */
 ChatBubble {
     margin-bottom: 1;
     padding: 1;
     background: #333;
     border: round #555;
     width: 100%;
+    height: auto;
 }
 
 .sender-label {
     color: #aaa;
     text-style: bold;
+}
+
+.message-text {
+    width: 100%;
+    height: auto;
+    color: #fff;
+}
+
+/* Force Markdown internals to be visible */
+.message-text>* {
+    color: #fff;
+    background: #444;
 }
 
 .user-message {
@@ -142,6 +156,8 @@ SymposiumBubble {
     padding: 1;
     background: #222;
     border: dashed #666;
+    height: auto;
+    width: 100%;
 }
 
 .symp-left {
@@ -162,6 +178,7 @@ SymposiumBubble {
 .symp-text {
     width: 100%;
     height: auto;
+    color: #eee;
 }
 
 .compact-loader {

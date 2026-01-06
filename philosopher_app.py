@@ -17,7 +17,11 @@ from symposium import Symposium
 from scheduler_service import SocraticScheduler
 
 # --- Configuration ---
-logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    filename='philosopher_debug.log',
+    level=logging.WARNING, # Keep warning level default but log to file
+    format='%(asctime)s - %(levelname)s - %(message)s'
+)
 
 # --- Ollama Server Auto-Launch (Helper) ---
 def is_ollama_running(host="127.0.0.1", port=11434):

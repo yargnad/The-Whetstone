@@ -53,18 +53,66 @@ class OllamaBackend(LLMBackend):
         return self._client
     
     def generate(self, prompt: str, stream: bool = True) -> Iterator[str]:
-        response = self.client.chat.completions.create(
-            model=self.model,
-            messages=[{"role": "user", "content": prompt}],
-            stream=stream,
-        )
+        try:
+            logger.debug(f"Sending request to Ollama: {self.model}")
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                stream=stream,
+            )
+        except Exception as e:
+            logger.exception("Ollama request failed")
+            # If streaming was requested, return an empty iterator so callers can handle gracefully
+            if stream:
+                return
+            raise
+
         if stream:
             for chunk in response:
-                content = chunk.choices[0].delta.content
+                logger.debug(f"Raw chunk: {chunk}")
+                content = None
+                # Try attribute-style access (OpenAI SDK object)
+                try:
+                    content = getattr(chunk.choices[0].delta, "content", None)
+                except Exception:
+                    pass
+
+                # Try dict-like access
+                if not content:
+                    try:
+                        if isinstance(chunk, dict):
+                            choices = chunk.get("choices")
+                            if choices and isinstance(choices[0], dict):
+                                delta = choices[0].get("delta")
+                                if isinstance(delta, dict):
+                                    content = delta.get("content") or delta.get("text")
+                                else:
+                                    content = getattr(delta, "content", None)
+                    except Exception:
+                        pass
+
+                # Fallbacks
+                if not content:
+                    try:
+                        if isinstance(chunk, dict):
+                             content = chunk.get("choices")[0].get("text")
+                    except: pass
+
                 if content:
+                    logger.debug(f"Yielding content: {content!r}")
                     yield content
+                else:
+                    # ignore heartbeats/empty chunks
+                    continue
         else:
-            yield response.choices[0].message.content
+            # Non-streaming
+            text = None
+            try:
+                text = getattr(response.choices[0].message, "content", None)
+            except Exception:
+                pass
+            if text:
+                yield text
     
     def is_available(self) -> bool:
         import socket
