@@ -1,0 +1,136 @@
+/* Basic Layout */
+Screen {
+    layout: vertical;
+    background: #111;
+    color: #eee;
+}
+
+#app-grid {
+    layout: grid;
+    grid-size: 2;
+    grid-columns: 30 1fr;
+}
+
+/* Sidebar */
+#sidebar {
+    background: #222;
+    border-right: solid #444;
+    padding: 1;
+}
+
+#logo {
+    text-align: center;
+    color: #ffd700;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+.section-title {
+    background: #333;
+    padding: 1;
+    margin-top: 1;
+    text-style: bold;
+}
+
+.setting-row {
+    height: 3;
+    align: center middle;
+    padding: 0 1;
+}
+
+/* Chat Area */
+#main-chat-area {
+    padding: 1;
+}
+
+#chat-history {
+    height: 1fr;
+    border: solid #444;
+    padding: 1;
+    margin-bottom: 1;
+}
+
+#input-bar {
+    height: 3;
+    dock: bottom;
+}
+
+#chat-input {
+    width: 1fr;
+}
+
+#btn-send {
+    width: 10;
+}
+
+/* Chat Bubbles */
+ChatBubble {
+    margin-bottom: 1;
+    padding: 1;
+    background: #333;
+    border: round #555;
+    width: 100%;
+    height: auto;
+}
+
+.sender-label {
+    color: #aaa;
+    text-style: bold;
+}
+
+.user-message {
+    background: #2b3b4b;
+    border: round #4da6ff;
+    text-align: right;
+}
+
+.ai-message {
+    background: #333;
+    border: round #ffd700;
+}
+
+
+/* Symposium Split Screen */
+#symp-container {
+    padding: 1;
+}
+
+#debate-stage {
+    height: 1fr;
+}
+
+.stage-col {
+    width: 1fr;
+    border: solid #555;
+    padding: 1;
+}
+
+.stage-name {
+    text-align: center;
+    background: #444;
+    color: white;
+    text-style: bold;
+}
+
+SymposiumBubble {
+    margin: 1;
+    padding: 1;
+    background: #222;
+    border: dashed #666;
+    height: auto;
+}
+
+.symp-left {
+    border: dashed #ff6b6b;
+    /* Reddish for P1 */
+}
+
+.symp-right {
+    border: dashed #4ecdc4;
+    /* Teal for P2 */
+}
+
+#symp-controls {
+    height: 3;
+    align: center middle;
+}
