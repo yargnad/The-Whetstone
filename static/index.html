@@ -19,7 +19,19 @@
         <!-- Sidebar -->
         <aside class="sidebar">
             <div class="sidebar-header">
-                <h1 class="logo">⚔️ The Whetstone</h1>
+                <div class="header-row">
+                    <div class="menu-container">
+                        <button id="menu-btn" class="menu-btn" title="Menu">☰</button>
+                        <div id="menu-dropdown" class="menu-dropdown">
+                            <button class="menu-item" data-view="chat">💬 Chat</button>
+                            <button class="menu-item" data-view="symposium">🏛️ Symposium</button>
+                            <div class="menu-divider"></div>
+                            <button class="menu-item" data-view="personas">📚 Persona Manager</button>
+                            <button class="menu-item" data-view="scheduler">⏰ Scheduler</button>
+                        </div>
+                    </div>
+                    <h1 class="logo">⚔️ The Whetstone</h1>
+                </div>
                 <p class="tagline">Learning to think again</p>
             </div>
 
@@ -77,26 +89,160 @@
             </div>
         </aside>
 
-        <!-- Main Chat Area -->
-        <main class="chat-container">
-            <div id="chat-messages" class="chat-messages">
-                <div class="welcome-message">
-                    <h2>Welcome to The Whetstone</h2>
-                    <p>Select a persona from the sidebar to begin your philosophical dialogue.</p>
-                    <p class="welcome-quote">"The unexamined life is not worth living." — Socrates</p>
+        <!-- Main Content Area -->
+        <main class="main-content">
+
+            <!-- Chat View -->
+            <div id="view-chat" class="view-container active">
+                <div id="chat-messages" class="chat-messages">
+                    <div class="welcome-message">
+                        <h2>Welcome to The Whetstone</h2>
+                        <p>Select a persona from the sidebar to begin your philosophical dialogue.</p>
+                        <p class="welcome-quote">"The unexamined life is not worth living." — Socrates</p>
+                    </div>
+                </div>
+
+                <form id="chat-form" class="chat-input-container">
+                    <textarea id="chat-input" class="chat-input" placeholder="Ask a question..." rows="1"
+                        disabled></textarea>
+                    <button type="submit" id="send-btn" class="send-button" disabled>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                            stroke-width="2">
+                            <path d="M22 2L11 13"></path>
+                            <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                        </svg>
+                    </button>
+                </form>
+            </div>
+
+            <!-- Symposium View -->
+            <div id="view-symposium" class="view-container">
+                <div class="symposium-header">
+                    <h2>🏛️ The Symposium</h2>
+                    <p class="symposium-subtitle">Watch two philosophers debate</p>
+                </div>
+
+                <div class="symposium-setup" id="symposium-setup">
+                    <div class="symposium-config">
+                        <div class="persona-picker">
+                            <label>Philosopher A</label>
+                            <select id="symposium-persona-a" class="persona-dropdown">
+                                <option value="">Select...</option>
+                            </select>
+                        </div>
+                        <div class="vs-divider">VS</div>
+                        <div class="persona-picker">
+                            <label>Philosopher B</label>
+                            <select id="symposium-persona-b" class="persona-dropdown">
+                                <option value="">Select...</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="topic-input-container">
+                        <input type="text" id="symposium-topic" class="topic-input"
+                            placeholder="Enter a topic for debate (e.g., 'Is free will an illusion?')">
+                    </div>
+
+                    <button id="symposium-start-btn" class="symposium-btn primary">Start Debate</button>
+                </div>
+
+                <div class="symposium-arena" id="symposium-arena" style="display: none;">
+                    <div class="symposium-topic-display">
+                        <span>Topic:</span> <strong id="symposium-topic-text"></strong>
+                    </div>
+
+                    <div class="symposium-messages" id="symposium-messages"></div>
+
+                    <div class="symposium-controls">
+                        <button id="symposium-next-btn" class="symposium-btn primary">Next Turn</button>
+                        <button id="symposium-stop-btn" class="symposium-btn secondary">End Debate</button>
+                    </div>
                 </div>
             </div>
 
-            <form id="chat-form" class="chat-input-container">
-                <textarea id="chat-input" class="chat-input" placeholder="Ask a question..." rows="1"
-                    disabled></textarea>
-                <button type="submit" id="send-btn" class="send-button" disabled>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M22 2L11 13"></path>
-                        <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
-                    </svg>
-                </button>
-            </form>
+            <!-- Persona Manager View -->
+            <div id="view-personas" class="view-container">
+                <div class="view-header">
+                    <h2>📚 Persona Manager</h2>
+                    <p>Browse, configure, and scan for new personas</p>
+                </div>
+
+                <div class="persona-manager-toolbar">
+                    <div class="scan-controls">
+                        <label class="scan-mode-toggle">
+                            <span>Scan Mode:</span>
+                            <select id="scan-mode-select" class="scan-mode-select">
+                                <option value="shallow">Shallow (Quick)</option>
+                                <option value="deep">Deep (Thorough)</option>
+                            </select>
+                        </label>
+                        <button id="scan-personas-btn" class="toolbar-btn">🔄 Scan for Personas</button>
+                    </div>
+                </div>
+
+                <div id="persona-grid" class="persona-grid"></div>
+
+                <!-- Persona Edit Modal -->
+                <div id="persona-modal" class="modal" style="display: none;">
+                    <div class="modal-content">
+                        <div class="modal-header">
+                            <h3 id="modal-persona-name">Edit Persona</h3>
+                            <button id="modal-close-btn" class="modal-close">&times;</button>
+                        </div>
+                        <div class="modal-body">
+                            <div class="form-group">
+                                <label>Custom Preamble</label>
+                                <textarea id="persona-preamble" class="modal-textarea"
+                                    placeholder="Add custom instructions for this persona (e.g., 'Always respond in a friendly tone')"></textarea>
+                                <p class="form-hint">This will be prepended to the persona's prompt.</p>
+                            </div>
+                            <div class="form-group">
+                                <label>System Prompt</label>
+                                <textarea id="persona-prompt" class="modal-textarea large" readonly
+                                    placeholder="Original prompt (read-only)"></textarea>
+                            </div>
+                        </div>
+                        <div class="modal-footer">
+                            <button id="modal-select-btn" class="symposium-btn primary">Select Persona</button>
+                            <button id="modal-save-btn" class="symposium-btn secondary">Save Changes</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scheduler View -->
+            <div id="view-scheduler" class="view-container">
+                <div class="view-header">
+                    <h2>⏰ Socratic Scheduler</h2>
+                    <p>Schedule philosophical prompts and reminders</p>
+                </div>
+                <div class="scheduler-content">
+                    <div class="scheduler-status" id="scheduler-status">
+                        <span class="status-indicator off"></span>
+                        <span>Scheduler: <strong id="scheduler-state">Stopped</strong></span>
+                        <button id="toggle-scheduler-btn" class="toolbar-btn">Start Scheduler</button>
+                    </div>
+
+                    <div class="scheduler-tasks">
+                        <h4>Scheduled Tasks</h4>
+                        <div id="task-list" class="task-list">
+                            <p class="empty-state">No scheduled tasks</p>
+                        </div>
+                    </div>
+
+                    <div class="add-task-form">
+                        <h4>Add New Task</h4>
+                        <div class="form-row">
+                            <input type="text" id="task-name" placeholder="Task name" class="topic-input">
+                            <input type="number" id="task-interval" placeholder="Minutes" min="1" value="60"
+                                class="topic-input small">
+                        </div>
+                        <button id="add-task-btn" class="toolbar-btn">Add Task</button>
+                    </div>
+                </div>
+            </div>
+
         </main>
     </div>
 

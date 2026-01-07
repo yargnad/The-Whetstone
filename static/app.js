@@ -10,8 +10,10 @@ const API_BASE = '';
 let currentPersona = null;
 let currentModel = null;
 let isStreaming = false;
+let currentView = 'chat';
+let symposiumActive = false;
 
-// DOM Elements
+// DOM Elements - Chat
 const personaSelect = document.getElementById('persona-select');
 const modelSelect = document.getElementById('model-select');
 const deepModeToggle = document.getElementById('deep-mode-toggle');
@@ -21,6 +23,34 @@ const chatMessages = document.getElementById('chat-messages');
 const chatForm = document.getElementById('chat-form');
 const chatInput = document.getElementById('chat-input');
 const sendBtn = document.getElementById('send-btn');
+
+// DOM Elements - Navigation
+const menuBtn = document.getElementById('menu-btn');
+const menuDropdown = document.getElementById('menu-dropdown');
+
+// DOM Elements - Symposium
+const symposiumPersonaA = document.getElementById('symposium-persona-a');
+const symposiumPersonaB = document.getElementById('symposium-persona-b');
+const symposiumTopic = document.getElementById('symposium-topic');
+const symposiumStartBtn = document.getElementById('symposium-start-btn');
+const symposiumNextBtn = document.getElementById('symposium-next-btn');
+const symposiumStopBtn = document.getElementById('symposium-stop-btn');
+const symposiumSetup = document.getElementById('symposium-setup');
+const symposiumArena = document.getElementById('symposium-arena');
+const symposiumMessages = document.getElementById('symposium-messages');
+const symposiumTopicText = document.getElementById('symposium-topic-text');
+const personaGrid = document.getElementById('persona-grid');
+
+// DOM Elements - Persona Manager
+const scanModeSelect = document.getElementById('scan-mode-select');
+const scanPersonasBtn = document.getElementById('scan-personas-btn');
+const personaModal = document.getElementById('persona-modal');
+const modalPersonaName = document.getElementById('modal-persona-name');
+const personaPreamble = document.getElementById('persona-preamble');
+const personaPrompt = document.getElementById('persona-prompt');
+const modalCloseBtn = document.getElementById('modal-close-btn');
+const modalSelectBtn = document.getElementById('modal-select-btn');
+const modalSaveBtn = document.getElementById('modal-save-btn');
 
 // Status elements
 const statusBackend = document.getElementById('status-backend');
@@ -39,7 +69,12 @@ async function init() {
     await loadPersonas();
     await loadModels();
     await loadChatHistory();
+    populateSymposiumPersonas();
+    populatePersonaGrid();
     setupEventListeners();
+    setupNavigation();
+    setupSymposium();
+    setupPersonaManager();
 }
 
 // =============================================
@@ -494,4 +529,376 @@ function setupEventListeners() {
             sendMessage(chatInput.value);
         }
     });
+}
+
+// =============================================
+// Navigation
+// =============================================
+
+function setupNavigation() {
+    // Toggle hamburger menu
+    menuBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        menuDropdown.classList.toggle('open');
+    });
+
+    // Close menu when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!menuDropdown.contains(e.target) && e.target !== menuBtn) {
+            menuDropdown.classList.remove('open');
+        }
+    });
+
+    // Menu item clicks
+    menuDropdown.querySelectorAll('.menu-item').forEach(item => {
+        item.addEventListener('click', () => {
+            switchView(item.dataset.view);
+            menuDropdown.classList.remove('open');
+        });
+    });
+}
+
+function switchView(viewName) {
+    currentView = viewName;
+
+    // Update view containers
+    document.querySelectorAll('.view-container').forEach(view => {
+        view.classList.toggle('active', view.id === `view-${viewName}`);
+    });
+}
+
+// =============================================
+// Symposium
+// =============================================
+
+function populateSymposiumPersonas() {
+    // Get personas from the main dropdown
+    const options = personaSelect.querySelectorAll('option');
+
+    symposiumPersonaA.innerHTML = '<option value="">Select...</option>';
+    symposiumPersonaB.innerHTML = '<option value="">Select...</option>';
+
+    options.forEach(opt => {
+        if (opt.value) {
+            symposiumPersonaA.innerHTML += `<option value="${opt.value}">${opt.textContent}</option>`;
+            symposiumPersonaB.innerHTML += `<option value="${opt.value}">${opt.textContent}</option>`;
+        }
+    });
+}
+
+function setupSymposium() {
+    symposiumStartBtn.addEventListener('click', startSymposium);
+    symposiumNextBtn.addEventListener('click', nextSymposiumTurn);
+    symposiumStopBtn.addEventListener('click', stopSymposium);
+}
+
+async function startSymposium() {
+    const personaA = symposiumPersonaA.value;
+    const personaB = symposiumPersonaB.value;
+    const topic = symposiumTopic.value.trim();
+
+    if (!personaA || !personaB) {
+        alert('Please select both philosophers');
+        return;
+    }
+
+    if (!topic) {
+        alert('Please enter a topic for debate');
+        return;
+    }
+
+    try {
+        const response = await fetch(`${API_BASE}/api/symposium/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                persona_a: personaA,
+                persona_b: personaB,
+                topic: topic
+            })
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            symposiumActive = true;
+            symposiumSetup.style.display = 'none';
+            symposiumArena.style.display = 'flex';
+            symposiumTopicText.textContent = topic;
+            symposiumMessages.innerHTML = '';
+
+            // Auto-trigger first turn
+            nextSymposiumTurn();
+        }
+    } catch (error) {
+        console.error('Failed to start symposium:', error);
+        alert('Failed to start symposium');
+    }
+}
+
+async function nextSymposiumTurn() {
+    if (!symposiumActive) return;
+
+    symposiumNextBtn.disabled = true;
+    symposiumNextBtn.textContent = 'Thinking...';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/symposium/next`);
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+
+        let buffer = '';
+        let currentSpeaker = '';
+        let fullText = '';
+        let bubble = null;
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+            buffer = buffer.replace(/\r\n/g, '\n');
+
+            let doubleNewline;
+            while ((doubleNewline = buffer.indexOf('\n\n')) !== -1) {
+                const message = buffer.substring(0, doubleNewline);
+                buffer = buffer.substring(doubleNewline + 2);
+
+                let eventType = '';
+                let eventData = '';
+
+                for (const line of message.split('\n')) {
+                    if (line.startsWith('event:')) {
+                        eventType = line.substring(6).trim();
+                    } else if (line.startsWith('data:')) {
+                        const dataContent = line.substring(5);
+                        eventData = dataContent.startsWith(' ') ? dataContent.substring(1) : dataContent;
+                    } else if (line.startsWith('id:')) {
+                        // Extract speaker from turn info if needed
+                    }
+                }
+
+                if (eventType === 'token' && eventData) {
+                    const decodedData = eventData.replace(/\\n/g, '\n');
+                    fullText += decodedData;
+
+                    if (!bubble) {
+                        // Create bubble - determine side based on turn count
+                        const turnCount = symposiumMessages.children.length;
+                        const side = turnCount % 2 === 0 ? 'left' : 'right';
+                        bubble = createSymposiumBubble('', side);
+                        symposiumMessages.appendChild(bubble);
+                    }
+
+                    bubble.querySelector('.bubble-text').innerHTML = formatMessage(fullText);
+                    symposiumMessages.scrollTop = symposiumMessages.scrollHeight;
+
+                } else if (eventType === 'complete' && eventData) {
+                    currentSpeaker = eventData;
+                    if (bubble) {
+                        bubble.querySelector('.speaker').textContent = currentSpeaker;
+                    }
+                } else if (eventType === 'done') {
+                    // Turn complete
+                }
+            }
+        }
+
+    } catch (error) {
+        console.error('Symposium turn error:', error);
+    } finally {
+        symposiumNextBtn.disabled = false;
+        symposiumNextBtn.textContent = 'Next Turn';
+    }
+}
+
+function createSymposiumBubble(speaker, side) {
+    const bubble = document.createElement('div');
+    bubble.className = `symposium-bubble ${side}`;
+    bubble.innerHTML = `
+        <div class="speaker">${speaker}</div>
+        <div class="bubble-text"></div>
+    `;
+    return bubble;
+}
+
+async function stopSymposium() {
+    try {
+        await fetch(`${API_BASE}/api/symposium/stop`, { method: 'POST' });
+    } catch (error) {
+        console.error('Failed to stop symposium:', error);
+    }
+
+    symposiumActive = false;
+    symposiumSetup.style.display = 'block';
+    symposiumArena.style.display = 'none';
+}
+
+// =============================================
+// Persona Grid & Manager
+// =============================================
+
+let currentEditingPersona = null;
+
+function populatePersonaGrid() {
+    personaGrid.innerHTML = '';
+
+    const options = personaSelect.querySelectorAll('option');
+    options.forEach(opt => {
+        if (opt.value) {
+            const card = document.createElement('div');
+            card.className = 'persona-card';
+            card.innerHTML = `
+                <h3>${opt.textContent}</h3>
+                <p>Click to select or configure this persona.</p>
+                <div class="persona-card-actions">
+                    <button class="select-btn" data-persona="${opt.value}">Select</button>
+                    <button class="config-btn" data-persona="${opt.value}">⚙️ Configure</button>
+                </div>
+            `;
+            personaGrid.appendChild(card);
+        }
+    });
+
+    // Add event listeners to buttons
+    personaGrid.querySelectorAll('.select-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            selectPersona(btn.dataset.persona);
+            personaSelect.value = btn.dataset.persona;
+            switchView('chat');
+        });
+    });
+
+    personaGrid.querySelectorAll('.config-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            openPersonaModal(btn.dataset.persona);
+        });
+    });
+}
+
+function setupPersonaManager() {
+    // Scan for personas
+    if (scanPersonasBtn) {
+        scanPersonasBtn.addEventListener('click', scanForPersonas);
+    }
+
+    // Modal close
+    if (modalCloseBtn) {
+        modalCloseBtn.addEventListener('click', closePersonaModal);
+    }
+
+    // Modal select button
+    if (modalSelectBtn) {
+        modalSelectBtn.addEventListener('click', () => {
+            if (currentEditingPersona) {
+                selectPersona(currentEditingPersona);
+                personaSelect.value = currentEditingPersona;
+                closePersonaModal();
+                switchView('chat');
+            }
+        });
+    }
+
+    // Modal save button
+    if (modalSaveBtn) {
+        modalSaveBtn.addEventListener('click', savePersonaPreamble);
+    }
+
+    // Close modal on outside click
+    if (personaModal) {
+        personaModal.addEventListener('click', (e) => {
+            if (e.target === personaModal) {
+                closePersonaModal();
+            }
+        });
+    }
+}
+
+async function scanForPersonas() {
+    const mode = scanModeSelect ? scanModeSelect.value : 'shallow';
+    const btn = scanPersonasBtn;
+
+    btn.disabled = true;
+    btn.textContent = '🔄 Scanning...';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/personas/scan?deep=${mode === 'deep'}`, {
+            method: 'POST'
+        });
+
+        const data = await response.json();
+
+        if (data.success) {
+            alert(`Scan complete! Found ${data.persona_count} personas (${data.mode} mode).`);
+            // Refresh personas
+            await loadPersonas();
+            populateSymposiumPersonas();
+            populatePersonaGrid();
+            await loadStatus();
+        } else {
+            alert('Scan failed: ' + (data.detail || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Scan failed:', error);
+        alert('Scan failed: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🔄 Scan for Personas';
+    }
+}
+
+async function openPersonaModal(personaName) {
+    currentEditingPersona = personaName;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/personas/${encodeURIComponent(personaName)}`);
+        const persona = await response.json();
+
+        modalPersonaName.textContent = persona.name;
+        personaPrompt.value = persona.prompt || '(No prompt available)';
+        personaPreamble.value = persona.custom_preamble || '';
+
+        personaModal.style.display = 'flex';
+    } catch (error) {
+        console.error('Failed to load persona:', error);
+        alert('Failed to load persona details');
+    }
+}
+
+function closePersonaModal() {
+    personaModal.style.display = 'none';
+    currentEditingPersona = null;
+}
+
+async function savePersonaPreamble() {
+    if (!currentEditingPersona || !personaPreamble) return;
+
+    const preamble = personaPreamble.value.trim();
+    const btn = modalSaveBtn;
+
+    btn.disabled = true;
+    btn.textContent = 'Saving...';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/personas/${encodeURIComponent(currentEditingPersona)}/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ preamble })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            alert('Preamble saved successfully!');
+        } else {
+            alert('Failed to save: ' + (data.detail || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Save failed:', error);
+        alert('Failed to save preamble: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
+    }
 }

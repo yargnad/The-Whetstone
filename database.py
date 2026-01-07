@@ -13,6 +13,8 @@ class DatabaseManager:
         self.db_path = db_path
         self._logging_enabled = False
         self._init_db()
+        # Load logging setting from DB
+        self._logging_enabled = self.get_setting("logging_enabled", False)
 
     def _init_db(self):
         """Initialize the database schema if it doesn't exist."""
@@ -30,7 +32,14 @@ class DatabaseManager:
                         meta TEXT
                     )
                 ''')
-                # Future: Add other tables here (e.g., user_profiles, achievements)
+                # Settings table for persistent, universal settings
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS settings (
+                        key TEXT PRIMARY KEY,
+                        value TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    )
+                ''')
                 conn.commit()
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
@@ -42,7 +51,38 @@ class DatabaseManager:
     @logging_enabled.setter
     def logging_enabled(self, value: bool):
         self._logging_enabled = value
+        self.set_setting("logging_enabled", value)
         logger.info(f"Database logging set to: {self._logging_enabled}")
+
+    def get_setting(self, key: str, default=None):
+        """Get a setting value from the database."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('SELECT value FROM settings WHERE key = ?', (key,))
+                row = cursor.fetchone()
+                if row:
+                    # Parse JSON value
+                    return json.loads(row[0])
+                return default
+        except Exception as e:
+            logger.error(f"Failed to get setting '{key}': {e}")
+            return default
+
+    def set_setting(self, key: str, value):
+        """Set a setting value in the database."""
+        try:
+            timestamp = datetime.utcnow().isoformat()
+            value_json = json.dumps(value)
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT OR REPLACE INTO settings (key, value, updated_at)
+                    VALUES (?, ?, ?)
+                ''', (key, value_json, timestamp))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Failed to set setting '{key}': {e}")
 
     def log_interaction(self, persona_name, user_query, ai_response, session_id=None, meta=None):
         """
@@ -77,3 +117,4 @@ class DatabaseManager:
         except Exception as e:
             logger.error(f"Failed to retrieve history: {e}")
             return []
+

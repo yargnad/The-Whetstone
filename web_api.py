@@ -21,6 +21,7 @@ from pydantic import BaseModel
 
 from core import PhilosopherCore
 from scheduler_service import SocraticScheduler
+from symposium import Symposium
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -29,6 +30,7 @@ logger = logging.getLogger(__name__)
 # --- Shared State ---
 core: Optional[PhilosopherCore] = None
 scheduler: Optional[SocraticScheduler] = None
+active_symposium: Optional[Symposium] = None
 
 
 @asynccontextmanager
@@ -98,6 +100,16 @@ class ModelSelectRequest(BaseModel):
     model_name: str
 
 
+class PersonaConfigRequest(BaseModel):
+    preamble: str
+
+
+class SymposiumStartRequest(BaseModel):
+    persona_a: str
+    persona_b: str
+    topic: str
+
+
 # --- Routes ---
 
 @app.get("/")
@@ -159,6 +171,108 @@ async def select_persona(request: PersonaSelectRequest):
     
     core.set_persona(persona)
     return {"success": True, "persona": persona.get("name")}
+
+
+def find_persona(name: str):
+    """Find a persona by key or display name."""
+    # Try direct key access
+    if name in core.personas:
+        return core.personas[name], name
+    
+    # Try lowercase key
+    if name.lower() in core.personas:
+        return core.personas[name.lower()], name.lower()
+    
+    # Try matching by 'name' field
+    for key, p in core.personas.items():
+        if p.get("name") == name:
+            return p, key
+            
+    return None, None
+
+
+@app.get("/api/personas/{persona_name}")
+async def get_persona_detail(persona_name: str):
+    """Get detailed information about a specific persona."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    
+    persona, key = find_persona(persona_name)
+    if not persona:
+        raise HTTPException(status_code=404, detail=f"Persona '{persona_name}' not found")
+    
+    # Get custom preamble from DB
+    custom_preamble = core.db.get_setting(f"persona_preamble_{persona.get('name')}", "")
+    
+    return {
+        "name": persona.get("name"),
+        "description": persona.get("description", ""),
+        "prompt": persona.get("prompt", ""),
+        "library_filter": persona.get("library_filter", []),
+        "custom_preamble": custom_preamble,
+        "key": key
+    }
+
+
+@app.post("/api/personas/{persona_name}/config")
+async def update_persona_config(persona_name: str, request: PersonaConfigRequest):
+    """Update custom configuration for a specific persona."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    
+    persona, _ = find_persona(persona_name)
+    if not persona:
+        raise HTTPException(status_code=404, detail=f"Persona '{persona_name}' not found")
+    
+    # Save to DB using the formal name as the key for better consistency
+    core.db.set_setting(f"persona_preamble_{persona.get('name')}", request.preamble)
+    return {"success": True, "persona": persona.get("name")}
+
+
+@app.post("/api/personas/scan")
+async def scan_personas(deep: bool = False):
+    """
+    Scan for new personas by running the generate_personas.py script.
+    Set deep=True for deep scan mode.
+    """
+    import subprocess
+    import sys
+    
+    script_path = os.path.join(
+        os.path.dirname(os.path.abspath(__file__)),
+        "philosophy_library",
+        "generate_personas.py"
+    )
+    
+    if not os.path.exists(script_path):
+        raise HTTPException(status_code=404, detail="Persona generator script not found")
+    
+    cmd = [sys.executable, script_path]
+    if deep:
+        cmd.append("--deep")
+    
+    try:
+        result = subprocess.run(
+            cmd,
+            cwd=os.path.dirname(script_path),
+            capture_output=True,
+            text=True,
+            timeout=120  # 2 minute timeout
+        )
+        
+        # Refresh personas in core
+        core.refresh_data()
+        
+        return {
+            "success": True,
+            "mode": "deep" if deep else "shallow",
+            "persona_count": len(core.get_valid_personas()),
+            "output": result.stdout[-500:] if result.stdout else ""  # Last 500 chars
+        }
+    except subprocess.TimeoutExpired:
+        raise HTTPException(status_code=504, detail="Scan timed out")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @app.post("/api/chat")
@@ -337,6 +451,103 @@ async def delete_scheduled_task(task_id: str):
     
     scheduler.remove_task(task_id)
     return {"success": True}
+
+
+# --- Symposium Endpoints ---
+
+@app.post("/api/symposium/start")
+async def start_symposium(request: SymposiumStartRequest):
+    """Start a new AI-to-AI debate (Symposium)."""
+    global active_symposium
+    
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    
+    # Get persona objects
+    persona_a = core.personas.get(request.persona_a)
+    persona_b = core.personas.get(request.persona_b)
+    
+    if not persona_a:
+        raise HTTPException(status_code=400, detail=f"Persona A '{request.persona_a}' not found")
+    if not persona_b:
+        raise HTTPException(status_code=400, detail=f"Persona B '{request.persona_b}' not found")
+    
+    active_symposium = Symposium(core, persona_a, persona_b, request.topic)
+    
+    return {
+        "success": True,
+        "persona_a": persona_a["name"],
+        "persona_b": persona_b["name"],
+        "topic": request.topic
+    }
+
+
+@app.get("/api/symposium/next")
+async def symposium_next_turn():
+    """Get the next turn in the Symposium. Streams response via SSE."""
+    global active_symposium
+    
+    if not active_symposium:
+        raise HTTPException(status_code=400, detail="No active symposium. Call /api/symposium/start first.")
+    
+    if not active_symposium.is_active:
+        raise HTTPException(status_code=400, detail="Symposium has ended.")
+    
+    async def generate():
+        try:
+            for event in active_symposium.next_turn():
+                if event["type"] == "token":
+                    # Encode newlines for SSE
+                    encoded = event["content"].replace('\n', '\\n')
+                    yield {
+                        "event": "token", 
+                        "data": encoded,
+                        "id": f"turn-{active_symposium.turn_count}"
+                    }
+                elif event["type"] == "complete":
+                    yield {
+                        "event": "complete",
+                        "data": event["content"]["speaker"]
+                    }
+                await asyncio.sleep(0)
+            
+            yield {"event": "done", "data": "[DONE]"}
+            
+        except Exception as e:
+            logger.error(f"Symposium error: {e}")
+            yield {"event": "error", "data": str(e)}
+    
+    return EventSourceResponse(generate())
+
+
+@app.post("/api/symposium/stop")
+async def stop_symposium():
+    """Stop the current Symposium."""
+    global active_symposium
+    
+    if active_symposium:
+        active_symposium.is_active = False
+        transcript = active_symposium.history
+        active_symposium = None
+        return {"success": True, "turns": len(transcript)}
+    
+    return {"success": True, "turns": 0}
+
+
+@app.get("/api/symposium/status")
+async def symposium_status():
+    """Get current Symposium status and history."""
+    if not active_symposium:
+        return {"active": False, "history": []}
+    
+    return {
+        "active": active_symposium.is_active,
+        "topic": active_symposium.topic,
+        "persona_a": active_symposium.persona_a["name"],
+        "persona_b": active_symposium.persona_b["name"],
+        "turn_count": active_symposium.turn_count,
+        "history": active_symposium.history
+    }
 
 
 # --- Main Entry Point ---

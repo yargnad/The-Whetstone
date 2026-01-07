@@ -226,7 +226,7 @@ def create_backend(
     backend = backend_type or os.getenv("WHETSTONE_BACKEND", "ollama").lower()
     
     if backend == "ollama":
-        model_name = model or os.getenv("WHETSTONE_MODEL", "qwen3:14b")
+        model_name = model or os.getenv("WHETSTONE_MODEL", "cogito:8b")
         return OllamaBackend(model=model_name)
     
     elif backend in ("llamacpp", "llama.cpp", "llama-cpp"):

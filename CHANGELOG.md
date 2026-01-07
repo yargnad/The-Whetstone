@@ -19,16 +19,25 @@ All notable changes to the Whetstone project will be documented in this file.
 ### Added
 - **Global Actions**: Implemented `action_toggle_deep` and `action_toggle_privacy` at the `App` level for consistent behavior across all screens.
 
-## [2026-01-07] - Phase 3: Web UI Implementation
+## [2026-01-07] - Phase 3: Web UI Implementation & Persona Manager
 
 ### Added
-- **Web API Server** (`web_api.py`): FastAPI backend with REST API and SSE streaming
-- **Chat Interface**: Modern dark-themed web UI with real-time streaming responses
-- **Model Selector**: Switch between Ollama models at runtime from the UI
-- **Chat History**: Persists conversations across page refreshes (when logging enabled)
-- **Markdown Rendering**: Full markdown support in chat bubbles (headers, lists, code blocks, blockquotes)
-- **TTS Prep**: `strip_stage_directions()` function for future voice integration - strips roleplay actions like `*pauses*` while keeping inline emphasis
+- **Web API Server** (`web_api.py`): FastAPI backend with REST API and SSE streaming.
+- **Enhanced Persona Manager**:
+    - **Per-Persona Configuration**: Edit custom preambles and instructions for each persona.
+    - **Backend Persistence**: Custom configurations are saved to the SQLite `settings` table.
+    - **Scan Modes**: Support for "Deep" vs. "Shallow" persona directory scanning.
+    - **Scan Integration**: GUI trigger for re-scanning the `philosophy_library/`.
+- **Navigation Refinement**: Consolidated "Scheduler" and "Persona Manager" into a responsive hamburger menu for a cleaner UI.
+- **Chat Interface**: Modern dark-themed web UI with real-time streaming responses.
+- **Model Selector**: Switch between Ollama models at runtime from the UI.
+- **Chat History**: Persists conversations across page refreshes (when logging enabled).
+- **Markdown Rendering**: Full markdown support in chat bubbles.
+- **TTS Prep**: `strip_stage_directions()` function for future voice integration.
+
+### Changed
+- **Default Model**: Updated default Ollama model to `cogito:8b`.
 
 ### Technical Decisions
-- **SSE over WebSockets**: Chose Server-Sent Events for streaming (better browser compatibility)
-- **Stage Direction Detection**: Uses newline heuristic (actions on own line) rather than custom markup - may revisit if edge cases arise
+- **SSE over WebSockets**: Chose Server-Sent Events for streaming (better browser compatibility).
+- **Persistence Strategy**: Used SQLite-backed key-value store in the `settings` table for per-persona metadata, ensuring configurations survive sessions without modifying the core `personas.json` library.

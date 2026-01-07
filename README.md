@@ -50,6 +50,7 @@ The Whetstone does not rely on hard-coded personalities. **The AI becomes what i
     2.  Copy it to the device via USB or the Bridge App.
     3.  **Done.** The Whetstone automatically generates an "Alan Watts" persona, indexes the text for RAG, and adopts his rhetorical style.
 * **No Code Required:** If you can copy a file, you can expand the AI's mind.
+* **Per-Persona Config:** Fine-tune individual philosophers with custom preambles and instructions via the Web UI.
 
 ---
 

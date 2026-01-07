@@ -40,7 +40,7 @@
 - [x] **Clarity Mode:** Accessible language toggle (less jargon)
 - [ ] **Dream Mode:** Background worker for past chat analysis
 - [ ] **Commonplace Book:** Insight extraction system
-- [ ] Settings & Configuration Page
+- [x] Settings & Configuration Page (Persona Manager)
 - [ ] API endpoints for Android Bridge
 
 ## Phase 3.5: UX Accessibility Features

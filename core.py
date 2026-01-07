@@ -66,13 +66,23 @@ class PhilosopherCore:
         self.knowledge_base: List[Dict] = []
         self.current_persona: Optional[Dict] = None
         self.session_id = str(uuid.uuid4())
-        self.deep_mode = False
-        self.clarity_mode = False  # Accessible language mode
         self.rag_limit = 3  # Number of RAG snippets to retrieve
+        
+        # Load persistent settings from DB
+        self.deep_mode = self.db.get_setting("deep_mode", False)
+        self.clarity_mode = self.db.get_setting("clarity_mode", False)
 
         # Initialize
         self._init_backend()
         self.refresh_data()
+        self._load_saved_persona()
+    
+    def _load_saved_persona(self):
+        """Load the last selected persona from DB."""
+        saved_persona_name = self.db.get_setting("current_persona", None)
+        if saved_persona_name and saved_persona_name in self.personas:
+            self.current_persona = self.personas[saved_persona_name]
+            print(f"[CORE] Restored persona: {saved_persona_name}")
 
     def _init_backend(self):
         """Initialize the LLM backend."""
@@ -120,14 +130,18 @@ class PhilosopherCore:
 
     def set_persona(self, persona: Dict):
         self.current_persona = persona
+        # Persist to DB for cross-interface sync
+        self.db.set_setting("current_persona", persona.get('name'))
         print(f"[CORE] Persona set to: {persona.get('name')}")
 
     def set_deep_mode(self, enabled: bool):
         self.deep_mode = enabled
+        self.db.set_setting("deep_mode", enabled)
 
     def set_clarity_mode(self, enabled: bool):
         """Enable/disable clarity mode for more accessible language."""
         self.clarity_mode = enabled
+        self.db.set_setting("clarity_mode", enabled)
 
     def set_logging(self, enabled: bool):
         self.db.logging_enabled = enabled
@@ -172,6 +186,11 @@ class PhilosopherCore:
             clarity_instruction = "\n\nCLARITY MODE: Speak in plain, accessible language. Avoid technical jargon and specialized terminology. When you must use a complex term, briefly explain it in parentheses. Your goal is to make deep ideas understandable to anyone, not to demonstrate erudition."
         else:
             clarity_instruction = ""
+
+        # Custom Preamble from DB
+        custom_preamble = self.db.get_setting(f"persona_preamble_{persona['name']}", "")
+        if custom_preamble:
+            persona_prompt = f"{custom_preamble}\n\n{persona_prompt}"
 
         if context_snippets:
             context_str = "\n\n---\n\n".join(
