@@ -17,7 +17,7 @@ client = OpenAI(
 )
 
 # Default LLM model - configurable via environment variable
-LLM_MODEL = os.getenv("WHETSTONE_MODEL", "qwen3:14b")
+LLM_MODEL = os.getenv("WHETSTONE_MODEL", "cogito:8b")
 
 
 def normalize_author_name(name):
@@ -102,6 +102,7 @@ def generate_meta_prompt(author, sample_text):
     style_summary = None
     for attempt in range(3):
         try:
+            print(f"[INFO] Requesting style summary for {author} using {LLM_MODEL} (attempt {attempt+1}/3)...")
             response = client.chat.completions.create(
                 model=LLM_MODEL,
                 messages=[
@@ -143,6 +144,7 @@ def generate_meta_prompt(author, sample_text):
 
     for attempt in range(3):
         try:
+            print(f"[INFO] Requesting persona prompt for {author} using {LLM_MODEL} (attempt {attempt+1}/3)...")
             response = client.chat.completions.create(
                 model=LLM_MODEL,
                 messages=[

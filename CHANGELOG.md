@@ -28,7 +28,8 @@ All notable changes to the Whetstone project will be documented in this file.
     - **Backend Persistence**: Custom configurations are saved to the SQLite `settings` table.
     - **Scan Modes**: Support for "Deep" vs. "Shallow" persona directory scanning.
     - **Scan Integration**: GUI trigger for re-scanning the `philosophy_library/`.
-- **Navigation Refinement**: Consolidated "Scheduler" and "Persona Manager" into a responsive hamburger menu for a cleaner UI.
+    - **Background Scanning**: Moved the persona library scan to an asynchronous background task with a status tracking endpoint (`/api/personas/scan/status`) to prevent gateway timeouts.
+    - **Navigation Refinement**: Consolidated "Scheduler" and "Persona Manager" into a responsive hamburger menu for a cleaner UI.
 - **Chat Interface**: Modern dark-themed web UI with real-time streaming responses.
 - **Model Selector**: Switch between Ollama models at runtime from the UI.
 - **Chat History**: Persists conversations across page refreshes (when logging enabled).

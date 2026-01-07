@@ -32,6 +32,21 @@ core: Optional[PhilosopherCore] = None
 scheduler: Optional[SocraticScheduler] = None
 active_symposium: Optional[Symposium] = None
 
+# --- Persona Scan State ---
+class ScanStatus:
+    def __init__(self):
+        self.is_running = False
+        self.start_time = None
+        self.end_time = None
+        self.success = False
+        self.error = None
+        self.mode = "shallow"
+        self.persona_count = 0
+        self.output = ""
+        self.lock = asyncio.Lock()
+
+scan_state = ScanStatus()
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -232,9 +247,32 @@ async def update_persona_config(persona_name: str, request: PersonaConfigRequest
 @app.post("/api/personas/scan")
 async def scan_personas(deep: bool = False):
     """
-    Scan for new personas by running the generate_personas.py script.
-    Set deep=True for deep scan mode.
+    Trigger a persona scan in the background.
     """
+    if scan_state.is_running:
+        return {"success": False, "message": "Scan already in progress"}
+    
+    async with scan_state.lock:
+        if scan_state.is_running:
+            return {"success": False, "message": "Scan already in progress"}
+        
+        scan_state.is_running = True
+        scan_state.start_time = asyncio.get_event_loop().time()
+        scan_state.mode = "deep" if deep else "shallow"
+        scan_state.success = False
+        scan_state.error = None
+        scan_state.output = ""
+    
+    # Run in background
+    asyncio.create_task(run_scan_task(deep))
+    
+    return {
+        "success": True,
+        "message": f"{scan_state.mode.capitalize()} scan started in background"
+    }
+
+async def run_scan_task(deep: bool):
+    """Background task for persona scanning."""
     import subprocess
     import sys
     
@@ -244,35 +282,56 @@ async def scan_personas(deep: bool = False):
         "generate_personas.py"
     )
     
-    if not os.path.exists(script_path):
-        raise HTTPException(status_code=404, detail="Persona generator script not found")
-    
     cmd = [sys.executable, script_path]
     if deep:
         cmd.append("--deep")
-    
+        
     try:
-        result = subprocess.run(
-            cmd,
-            cwd=os.path.dirname(script_path),
-            capture_output=True,
-            text=True,
-            timeout=120  # 2 minute timeout
+        # Run subprocess in a thread to not block the event loop
+        loop = asyncio.get_event_loop()
+        result = await loop.run_in_executor(
+            None,
+            lambda: subprocess.run(
+                cmd,
+                cwd=os.path.dirname(script_path),
+                capture_output=True,
+                text=True,
+                timeout=300 # 5 minute timeout for background task
+            )
         )
         
         # Refresh personas in core
-        core.refresh_data()
-        
-        return {
-            "success": True,
-            "mode": "deep" if deep else "shallow",
-            "persona_count": len(core.get_valid_personas()),
-            "output": result.stdout[-500:] if result.stdout else ""  # Last 500 chars
-        }
-    except subprocess.TimeoutExpired:
-        raise HTTPException(status_code=504, detail="Scan timed out")
+        if core:
+            core.refresh_data()
+            
+        async with scan_state.lock:
+            scan_state.is_running = False
+            scan_state.end_time = asyncio.get_event_loop().time()
+            scan_state.success = True
+            scan_state.persona_count = len(core.get_valid_personas()) if core else 0
+            scan_state.output = result.stdout[-1000:] if result.stdout else ""
+            
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        logger.error(f"[API] Persona scan failed: {e}")
+        async with scan_state.lock:
+            scan_state.is_running = False
+            scan_state.end_time = asyncio.get_event_loop().time()
+            scan_state.success = False
+            scan_state.error = str(e)
+
+@app.get("/api/personas/scan/status")
+async def get_scan_status():
+    """Get the status of the current or last persona scan."""
+    return {
+        "is_running": scan_state.is_running,
+        "mode": scan_state.mode,
+        "success": scan_state.success,
+        "error": scan_state.error,
+        "persona_count": scan_state.persona_count,
+        "output": scan_state.output,
+        "duration": (scan_state.end_time - scan_state.start_time) if scan_state.end_time else 
+                    (asyncio.get_event_loop().time() - scan_state.start_time) if scan_state.start_time else 0
+    }
 
 
 @app.post("/api/chat")
