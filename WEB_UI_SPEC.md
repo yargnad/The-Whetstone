@@ -26,10 +26,19 @@
   * Input history.
   * `/deep` toggle button.
 
-### C. "The Library" (Management)
+### C. "The Library" (Persona Manager)
 
-* **Persona Manager:** List, Delete, Import (`.whetstone` upload).
+* **Persona Manager:** 
+  * List, Delete, Import (`.whetstone` upload).
+  * Manual "Scan Library" button (matches TUI/CLI logic).
 * **Socratic Scheduler:** Visual calendar/list of active schedules.
+
+## 3. UI Parity Principles
+
+To ensure a seamless experience across all interfaces (CLI, TUI, Web), the following structural rules apply:
+1. **Naming Consistency:** If a feature is "Persona Manager" in the TUI, it must be "Persona Manager" in the Web UI.
+2. **Screen Logic:** High-level managers (Scheduler, Personas, Symposium) should be distinct screens/menus rather than flat buttons in the sidebar where possible.
+3. **Global Toggles:** System-wide settings (Deep Mode, Privacy) should be easily accessible but not dominate the primary content space.
 
 ### D. Settings
 

@@ -55,7 +55,9 @@ To avoid "painting ourselves into a corner":
     * *Now:* `while True: input() -> LLM -> print()`
     * *Future:* `API -> Core -> LLM -> DB -> API`
 
-## 4. "Nice to Have" considerations
+## 5. Active Development: UI Parity (Planned for Tomorrow)
 
-* **Mesh Networking:** Requires mDNS/Avahi discovery. We should bundle these libs in the OS image (Armbian) now, even if unused.
-* **Vision:** Ensure the NPU/GPU drivers support standard camera interfaces (V4L2) in the container/OS.
+* **Persona Manager Screen:** Refactor the "Update Personas" button into a dedicated "Persona Manager" screen that matches the CLI's rich menu (Deep vs shallow scan, import, delete).
+* **Structure Normalization:** Audit all 3 interfaces (CLI, TUI, Web) to ensure metadata, headers, and navigation patterns are identical.
+* **Component Reuse:** Ensure the TUI's "Manager" screens (Scheduler, Persona) are the blueprint for the Web UI's navigation.
+

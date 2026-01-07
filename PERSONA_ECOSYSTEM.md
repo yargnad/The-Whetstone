@@ -50,4 +50,10 @@ The Web UI (Phase 3) will be the hub for managing this ecosystem:
 
 * **"The Agora" (Marketplace):** Browse available local personas.
 * **"The Forge" (Create):** Upload texts to generate new personas (Standard Mode) or Upload `.whetstone` files (High-Res Mode).
-* **"The Mirror" (Clone):** Progress bar showing "Cloning Readiness" (e.g., "340/500 turns").
+## 4. Management & Interface Consistency
+
+To support the transition from a "Script" to a "Platform", all management interfaces (CLI, TUI, Web) must adopt the **Persona Manager** nomenclature and structure:
+* **The Manager:** A dedicated screen for scanning, deleting, and importing personas.
+* **Scan Modes:** Standardize "Shallow" (filename only) vs "Deep" (content analysis) scanning options across all UIs.
+* **Parity:** What is manageable in the CLI's `Settings -> Update Personas` must be identical in the TUI's `Persona Manager` screen.
+

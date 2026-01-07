@@ -76,13 +76,10 @@ How does the device get attention?
 3. **LED:** Pulse specific color (e.g., Cyan for "Thought Ready").
 4. **TTS:** Optionally read it aloud immediately (configurable).
 
-## 4. User Interface
+## 5. UI Parity & Navigation
 
-Added to **Settings Menu**:
+The Socratic Scheduler must be consistently implemented as a **Socratic Scheduler Manager** across all interfaces:
+* **TUI/Web:** A full-screen management interface with a task list and creation form.
+* **Shortcuts:** Standardize global toggles (e.g., Command Palette in TUI, Top Bar in Web) for quick enable/disable without entering the full manager.
+* **Parity:** The CLI's nested menu structure serves as the logical source of truth for the available operations in the TUI/Web Managers.
 
-```
-4: Socratic Scheduler
-   > 1. Add Schedule
-   > 2. List/Edit Schedules
-   > 3. Toggle Global Scheduler (ON/OFF)
-```
