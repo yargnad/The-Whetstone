@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Whetstone</title>
+    <meta name="description" content="Cognitive Strengthening - Learning to think again">
+    <link rel="stylesheet" href="/static/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap"
+        rel="stylesheet">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1 class="logo">⚔️ The Whetstone</h1>
+                <p class="tagline">Learning to think again</p>
+            </div>
+
+            <div class="sidebar-section">
+                <h3 class="section-title">Persona</h3>
+                <select id="persona-select" class="persona-dropdown">
+                    <option value="">Loading personas...</option>
+                </select>
+            </div>
+
+            <div class="sidebar-section">
+                <h3 class="section-title">Model</h3>
+                <select id="model-select" class="persona-dropdown">
+                    <option value="">Loading models...</option>
+                </select>
+            </div>
+
+            <div class="sidebar-section">
+                <h3 class="section-title">Settings</h3>
+                <label class="toggle-row">
+                    <span>Deep Mode</span>
+                    <input type="checkbox" id="deep-mode-toggle" class="toggle-input">
+                    <span class="toggle-slider"></span>
+                </label>
+                <label class="toggle-row" title="Simpler language, less jargon">
+                    <span>Clarity Mode</span>
+                    <input type="checkbox" id="clarity-mode-toggle" class="toggle-input">
+                    <span class="toggle-slider"></span>
+                </label>
+                <label class="toggle-row">
+                    <span>Log Chats</span>
+                    <input type="checkbox" id="logging-toggle" class="toggle-input">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+
+            <div class="sidebar-section">
+                <h3 class="section-title">Status</h3>
+                <div id="status-info" class="status-info">
+                    <div class="status-row">
+                        <span>Backend:</span>
+                        <span id="status-backend">—</span>
+                    </div>
+                    <div class="status-row">
+                        <span>Personas:</span>
+                        <span id="status-personas">—</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <a href="https://github.com/yargnad/The-Whetstone" target="_blank" class="github-link">
+                    View on GitHub
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Chat Area -->
+        <main class="chat-container">
+            <div id="chat-messages" class="chat-messages">
+                <div class="welcome-message">
+                    <h2>Welcome to The Whetstone</h2>
+                    <p>Select a persona from the sidebar to begin your philosophical dialogue.</p>
+                    <p class="welcome-quote">"The unexamined life is not worth living." — Socrates</p>
+                </div>
+            </div>
+
+            <form id="chat-form" class="chat-input-container">
+                <textarea id="chat-input" class="chat-input" placeholder="Ask a question..." rows="1"
+                    disabled></textarea>
+                <button type="submit" id="send-btn" class="send-button" disabled>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13"></path>
+                        <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                    </svg>
+                </button>
+            </form>
+        </main>
+    </div>
+
+    <script src="/static/app.js"></script>
+</body>
+
+</html>

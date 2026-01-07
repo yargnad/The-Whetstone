@@ -18,3 +18,17 @@ All notable changes to the Whetstone project will be documented in this file.
 
 ### Added
 - **Global Actions**: Implemented `action_toggle_deep` and `action_toggle_privacy` at the `App` level for consistent behavior across all screens.
+
+## [2026-01-07] - Phase 3: Web UI Implementation
+
+### Added
+- **Web API Server** (`web_api.py`): FastAPI backend with REST API and SSE streaming
+- **Chat Interface**: Modern dark-themed web UI with real-time streaming responses
+- **Model Selector**: Switch between Ollama models at runtime from the UI
+- **Chat History**: Persists conversations across page refreshes (when logging enabled)
+- **Markdown Rendering**: Full markdown support in chat bubbles (headers, lists, code blocks, blockquotes)
+- **TTS Prep**: `strip_stage_directions()` function for future voice integration - strips roleplay actions like `*pauses*` while keeping inline emphasis
+
+### Technical Decisions
+- **SSE over WebSockets**: Chose Server-Sent Events for streaming (better browser compatibility)
+- **Stage Direction Detection**: Uses newline heuristic (actions on own line) rather than custom markup - may revisit if edge cases arise

@@ -1,0 +1,359 @@
+"""
+The Whetstone - Web API Server
+Phase 3 Implementation
+
+FastAPI backend providing REST API + SSE streaming for the Web UI.
+Run with: python web_api.py
+"""
+
+import os
+import asyncio
+import logging
+from typing import Optional
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from sse_starlette.sse import EventSourceResponse
+from pydantic import BaseModel
+
+from core import PhilosopherCore
+from scheduler_service import SocraticScheduler
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+# --- Shared State ---
+core: Optional[PhilosopherCore] = None
+scheduler: Optional[SocraticScheduler] = None
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize core services on startup."""
+    global core, scheduler
+    logger.info("[API] Starting Whetstone Web API...")
+    
+    core = PhilosopherCore()
+    scheduler = SocraticScheduler(core)
+    scheduler.start()
+    
+    logger.info("[API] Core and Scheduler initialized.")
+    yield
+    
+    # Cleanup
+    scheduler.stop()
+    logger.info("[API] Shutdown complete.")
+
+
+app = FastAPI(
+    title="The Whetstone API",
+    description="REST API for The Whetstone philosophical AI assistant",
+    version="1.0.0",
+    lifespan=lifespan
+)
+
+# CORS for local development
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Mount static files
+STATIC_DIR = os.path.join(os.path.dirname(__file__), "static")
+if os.path.exists(STATIC_DIR):
+    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+
+
+# --- Request/Response Models ---
+
+class ChatRequest(BaseModel):
+    message: str
+    persona_id: Optional[str] = None
+
+
+class PersonaSelectRequest(BaseModel):
+    persona_name: str
+
+
+class SettingsRequest(BaseModel):
+    enabled: bool
+
+
+class SchedulerTaskRequest(BaseModel):
+    name: str
+    interval_minutes: int
+    action_type: str = "toast"
+    persona_name: str = "Random"
+    topic: str = ""
+
+
+class ModelSelectRequest(BaseModel):
+    model_name: str
+
+
+# --- Routes ---
+
+@app.get("/")
+async def serve_index():
+    """Serve the main HTML page."""
+    index_path = os.path.join(STATIC_DIR, "index.html")
+    if os.path.exists(index_path):
+        return FileResponse(index_path)
+    return JSONResponse({"error": "Frontend not found. Ensure static/index.html exists."}, status_code=404)
+
+
+@app.get("/api/status")
+async def get_status():
+    """System health and info."""
+    return {
+        "status": "ok",
+        "backend": core.backend.name if core and core.backend else "not initialized",
+        "persona_count": len(core.get_valid_personas()) if core else 0,
+        "current_persona": core.current_persona.get("name") if core and core.current_persona else None,
+        "deep_mode": core.deep_mode if core else False,
+        "clarity_mode": core.clarity_mode if core else False,
+        "logging_enabled": core.db.logging_enabled if core else False,
+        "scheduler_running": scheduler.running if scheduler else False,
+        "scheduled_tasks": len(scheduler.tasks) if scheduler else 0
+    }
+
+
+@app.get("/api/personas")
+async def list_personas():
+    """List all valid personas."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    
+    personas = core.get_valid_personas()
+    return {
+        "personas": [
+            {
+                "name": p.get("name", "Unknown"),
+                "description": p.get("description", ""),
+                "library_filter": p.get("library_filter", [])
+            }
+            for p in personas
+        ],
+        "current": core.current_persona.get("name") if core.current_persona else None
+    }
+
+
+@app.post("/api/personas/select")
+async def select_persona(request: PersonaSelectRequest):
+    """Set the current persona by name."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    
+    personas = core.get_valid_personas()
+    persona = next((p for p in personas if p.get("name") == request.persona_name), None)
+    
+    if not persona:
+        raise HTTPException(status_code=404, detail=f"Persona '{request.persona_name}' not found")
+    
+    core.set_persona(persona)
+    return {"success": True, "persona": persona.get("name")}
+
+
+@app.post("/api/chat")
+async def chat(request: ChatRequest):
+    """
+    Send a message and get AI response via Server-Sent Events.
+    Streams tokens as they are generated.
+    """
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    
+    if not core.current_persona:
+        raise HTTPException(status_code=400, detail="No persona selected. Call /api/personas/select first.")
+    
+    async def generate():
+        try:
+            # Run the blocking generator in a thread pool
+            loop = asyncio.get_event_loop()
+            
+            def get_tokens():
+                return list(core.chat(request.message))
+            
+            # Get all tokens (core.chat is a generator)
+            # We need to stream them, so we'll iterate
+            for token in core.chat(request.message):
+                # SSE data field cannot contain raw newlines
+                # Encode them as literal \n so client can decode
+                encoded_token = token.replace('\n', '\\n')
+                yield {"event": "token", "data": encoded_token}
+                await asyncio.sleep(0)  # Yield control
+            
+            yield {"event": "done", "data": "[DONE]"}
+            
+        except Exception as e:
+            logger.error(f"Chat error: {e}")
+            yield {"event": "error", "data": str(e)}
+    
+    return EventSourceResponse(generate())
+
+
+@app.get("/api/history")
+async def get_history(limit: int = 50):
+    """Get recent chat history from the database."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    
+    history = core.db.get_history(limit=limit)
+    return {"history": history}
+
+
+@app.post("/api/settings/deep-mode")
+async def toggle_deep_mode(request: SettingsRequest):
+    """Toggle deep mode (longer responses)."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    
+    core.set_deep_mode(request.enabled)
+    return {"deep_mode": core.deep_mode}
+
+
+@app.post("/api/settings/logging")
+async def toggle_logging(request: SettingsRequest):
+    """Toggle database logging (privacy control)."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    
+    core.set_logging(request.enabled)
+    return {"logging_enabled": core.db.logging_enabled}
+
+
+@app.post("/api/settings/clarity-mode")
+async def toggle_clarity_mode(request: SettingsRequest):
+    """Toggle clarity mode (accessible language without jargon)."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    
+    core.set_clarity_mode(request.enabled)
+    return {"clarity_mode": core.clarity_mode}
+
+
+# --- Model Endpoints ---
+
+@app.get("/api/models")
+async def list_models():
+    """List available Ollama models."""
+    import requests
+    try:
+        # Query Ollama for available models
+        response = requests.get("http://localhost:11434/api/tags", timeout=5)
+        if response.status_code == 200:
+            data = response.json()
+            models = [m.get("name", "") for m in data.get("models", [])]
+            current_model = None
+            if core and core.backend:
+                current_model = getattr(core.backend, 'model', None)
+            return {
+                "models": models,
+                "current": current_model
+            }
+        else:
+            return {"models": [], "current": None, "error": "Could not fetch models"}
+    except Exception as e:
+        logger.error(f"Failed to list models: {e}")
+        return {"models": [], "current": None, "error": str(e)}
+
+
+@app.post("/api/models/select")
+async def select_model(request: ModelSelectRequest):
+    """Switch to a different Ollama model."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    
+    try:
+        from backends import OllamaBackend
+        # Create new backend with selected model
+        core.backend = OllamaBackend(model=request.model_name)
+        
+        # Verify it's available
+        if not core.backend.is_available():
+            raise HTTPException(status_code=400, detail=f"Model '{request.model_name}' is not available")
+        
+        logger.info(f"[API] Switched to model: {request.model_name}")
+        return {"success": True, "model": request.model_name}
+    except Exception as e:
+        logger.error(f"Failed to switch model: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# --- Scheduler Endpoints ---
+
+@app.get("/api/scheduler")
+async def list_scheduled_tasks():
+    """List all scheduled tasks."""
+    if not scheduler:
+        raise HTTPException(status_code=503, detail="Scheduler not initialized")
+    
+    return {
+        "running": scheduler.running,
+        "tasks": [
+            {
+                "id": t.id,
+                "name": t.name,
+                "interval_minutes": t.interval_minutes,
+                "action_type": t.action_type,
+                "persona_name": t.persona_name,
+                "topic": t.topic,
+                "enabled": t.enabled
+            }
+            for t in scheduler.tasks
+        ]
+    }
+
+
+@app.post("/api/scheduler")
+async def create_scheduled_task(request: SchedulerTaskRequest):
+    """Create a new scheduled task."""
+    if not scheduler:
+        raise HTTPException(status_code=503, detail="Scheduler not initialized")
+    
+    task = scheduler.add_task(
+        name=request.name,
+        interval=request.interval_minutes,
+        action=request.action_type,
+        persona=request.persona_name,
+        topic=request.topic
+    )
+    
+    return {"success": True, "task_id": task.id}
+
+
+@app.delete("/api/scheduler/{task_id}")
+async def delete_scheduled_task(task_id: str):
+    """Delete a scheduled task."""
+    if not scheduler:
+        raise HTTPException(status_code=503, detail="Scheduler not initialized")
+    
+    scheduler.remove_task(task_id)
+    return {"success": True}
+
+
+# --- Main Entry Point ---
+
+if __name__ == "__main__":
+    import uvicorn
+    
+    # Ensure Ollama is running (reuse logic from philosopher_app)
+    from philosopher_app import is_ollama_running, launch_ollama_server
+    
+    if os.getenv("WHETSTONE_BACKEND", "ollama") == "ollama":
+        if not is_ollama_running():
+            launch_ollama_server()
+    
+    print("\n" + "="*50)
+    print("  THE WHETSTONE - Web Interface")
+    print("  http://localhost:8080")
+    print("="*50 + "\n")
+    
+    uvicorn.run(app, host="0.0.0.0", port=8080, log_level="info")

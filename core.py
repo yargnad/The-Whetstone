@@ -3,6 +3,7 @@ import json
 import logging
 import uuid
 import glob
+import re
 from typing import Optional, Generator, Dict, List
 
 from database import DatabaseManager
@@ -16,6 +17,47 @@ PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 PERSONAS_PATH = os.path.join(PROJECT_DIR, "philosophy_library", "personas.json")
 KNOWLEDGE_BASE_PATH = os.path.join(PROJECT_DIR, "philosophy_library")
 
+
+def strip_stage_directions(text: str) -> str:
+    """
+    Remove stage directions (roleplay actions) for TTS while preserving inline emphasis.
+    
+    Stage directions are identified as *italicized text* that appears on its own line.
+    Inline emphasis like "that's *really* important" is preserved.
+    
+    Args:
+        text: The AI response text with potential stage directions
+        
+    Returns:
+        Text with stage directions removed, suitable for TTS
+        
+    Example:
+        Input:
+            *I pause thoughtfully*
+            That's *really* profound, you know.
+            *My voice softens*
+            
+        Output:
+            That's *really* profound, you know.
+    """
+    if not text:
+        return text
+    
+    lines = text.split('\n')
+    spoken_lines = []
+    
+    for line in lines:
+        stripped = line.strip()
+        # Skip lines that are ONLY stage directions (entire line is *...*) 
+        if stripped and re.match(r'^\*[^*]+\*$', stripped):
+            continue  # This is a stage direction - skip for TTS
+        spoken_lines.append(line)
+    
+    # Clean up multiple blank lines that result from removal
+    result = '\n'.join(spoken_lines)
+    result = re.sub(r'\n{3,}', '\n\n', result)  # Max 2 newlines in a row
+    return result.strip()
+
 class PhilosopherCore:
     def __init__(self):
         self.db = DatabaseManager()
@@ -25,6 +67,7 @@ class PhilosopherCore:
         self.current_persona: Optional[Dict] = None
         self.session_id = str(uuid.uuid4())
         self.deep_mode = False
+        self.clarity_mode = False  # Accessible language mode
         self.rag_limit = 3  # Number of RAG snippets to retrieve
 
         # Initialize
@@ -82,6 +125,10 @@ class PhilosopherCore:
     def set_deep_mode(self, enabled: bool):
         self.deep_mode = enabled
 
+    def set_clarity_mode(self, enabled: bool):
+        """Enable/disable clarity mode for more accessible language."""
+        self.clarity_mode = enabled
+
     def set_logging(self, enabled: bool):
         self.db.logging_enabled = enabled
 
@@ -119,6 +166,12 @@ class PhilosopherCore:
             length_instruction = "\n\nProvide a thoughtful, thorough response. Take your time to explore the question deeply."
         else:
             length_instruction = "\n\nIMPORTANT: Keep your response concise - 2-3 sentences maximum. Be direct and insightful, not exhaustive."
+        
+        # Clarity mode: accessible language without jargon
+        if self.clarity_mode:
+            clarity_instruction = "\n\nCLARITY MODE: Speak in plain, accessible language. Avoid technical jargon and specialized terminology. When you must use a complex term, briefly explain it in parentheses. Your goal is to make deep ideas understandable to anyone, not to demonstrate erudition."
+        else:
+            clarity_instruction = ""
 
         if context_snippets:
             context_str = "\n\n---\n\n".join(
@@ -132,13 +185,13 @@ Here is some context from your library that may be relevant to the user's query:
 {context_str}
 ---
 
-Now, carefully consider the user's question and respond in character, grounding your response in the provided texts.{length_instruction}
+Now, carefully consider the user's question and respond in character, grounding your response in the provided texts.{length_instruction}{clarity_instruction}
 User's Question: {query}
 AI Philosopher:"""
         else:
             prompt = f"""{persona_prompt}
 
-Carefully consider the user's question and respond in character.{length_instruction}
+Carefully consider the user's question and respond in character.{length_instruction}{clarity_instruction}
 User's Question: {query}
 AI Philosopher:"""
         return prompt

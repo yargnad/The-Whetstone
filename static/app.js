@@ -1,0 +1,497 @@
+/**
+ * The Whetstone - Web UI JavaScript
+ * Handles API communication and UI interactions
+ */
+
+// API Base URL
+const API_BASE = '';
+
+// State
+let currentPersona = null;
+let currentModel = null;
+let isStreaming = false;
+
+// DOM Elements
+const personaSelect = document.getElementById('persona-select');
+const modelSelect = document.getElementById('model-select');
+const deepModeToggle = document.getElementById('deep-mode-toggle');
+const clarityModeToggle = document.getElementById('clarity-mode-toggle');
+const loggingToggle = document.getElementById('logging-toggle');
+const chatMessages = document.getElementById('chat-messages');
+const chatForm = document.getElementById('chat-form');
+const chatInput = document.getElementById('chat-input');
+const sendBtn = document.getElementById('send-btn');
+
+// Status elements
+const statusBackend = document.getElementById('status-backend');
+const statusPersonas = document.getElementById('status-personas');
+
+// =============================================
+// Initialization
+// =============================================
+
+document.addEventListener('DOMContentLoaded', () => {
+    init();
+});
+
+async function init() {
+    await loadStatus();
+    await loadPersonas();
+    await loadModels();
+    await loadChatHistory();
+    setupEventListeners();
+}
+
+// =============================================
+// API Functions
+// =============================================
+
+async function loadStatus() {
+    try {
+        const response = await fetch(`${API_BASE}/api/status`);
+        const data = await response.json();
+
+        statusBackend.textContent = data.backend || '—';
+        statusPersonas.textContent = data.persona_count || 0;
+
+        deepModeToggle.checked = data.deep_mode || false;
+        clarityModeToggle.checked = data.clarity_mode || false;
+        loggingToggle.checked = data.logging_enabled || false;
+
+        if (data.current_persona) {
+            currentPersona = data.current_persona;
+        }
+    } catch (error) {
+        console.error('Failed to load status:', error);
+        statusBackend.textContent = 'Error';
+    }
+}
+
+async function loadPersonas() {
+    try {
+        const response = await fetch(`${API_BASE}/api/personas`);
+        const data = await response.json();
+
+        personaSelect.innerHTML = '<option value="">Select a persona...</option>';
+
+        data.personas.forEach(persona => {
+            const option = document.createElement('option');
+            option.value = persona.name;
+            option.textContent = persona.name;
+            if (persona.name === data.current) {
+                option.selected = true;
+                currentPersona = persona.name;
+                enableChat();
+            }
+            personaSelect.appendChild(option);
+        });
+
+    } catch (error) {
+        console.error('Failed to load personas:', error);
+        personaSelect.innerHTML = '<option value="">Failed to load</option>';
+    }
+}
+
+async function selectPersona(name) {
+    if (!name) return;
+
+    try {
+        const response = await fetch(`${API_BASE}/api/personas/select`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ persona_name: name })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            currentPersona = name;
+            enableChat();
+            clearWelcomeMessage();
+        }
+    } catch (error) {
+        console.error('Failed to select persona:', error);
+    }
+}
+
+async function toggleDeepMode(enabled) {
+    try {
+        await fetch(`${API_BASE}/api/settings/deep-mode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled })
+        });
+    } catch (error) {
+        console.error('Failed to toggle deep mode:', error);
+    }
+}
+
+async function toggleLogging(enabled) {
+    try {
+        await fetch(`${API_BASE}/api/settings/logging`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled })
+        });
+    } catch (error) {
+        console.error('Failed to toggle logging:', error);
+    }
+}
+
+async function toggleClarityMode(enabled) {
+    try {
+        await fetch(`${API_BASE}/api/settings/clarity-mode`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ enabled })
+        });
+    } catch (error) {
+        console.error('Failed to toggle clarity mode:', error);
+    }
+}
+
+async function loadModels() {
+    try {
+        const response = await fetch(`${API_BASE}/api/models`);
+        const data = await response.json();
+
+        modelSelect.innerHTML = '<option value="">Select a model...</option>';
+
+        if (data.models && data.models.length > 0) {
+            data.models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                if (model === data.current) {
+                    option.selected = true;
+                    currentModel = model;
+                }
+                modelSelect.appendChild(option);
+            });
+        } else {
+            modelSelect.innerHTML = '<option value="">No models found</option>';
+        }
+    } catch (error) {
+        console.error('Failed to load models:', error);
+        modelSelect.innerHTML = '<option value="">Failed to load</option>';
+    }
+}
+
+async function selectModel(name) {
+    if (!name) return;
+
+    try {
+        modelSelect.disabled = true;
+        modelSelect.style.opacity = '0.5';
+
+        const response = await fetch(`${API_BASE}/api/models/select`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ model_name: name })
+        });
+
+        const data = await response.json();
+        if (data.success) {
+            currentModel = name;
+            statusBackend.textContent = `Ollama (${name})`;
+        } else {
+            alert('Failed to switch model: ' + (data.detail || 'Unknown error'));
+            // Revert selection
+            await loadModels();
+        }
+    } catch (error) {
+        console.error('Failed to select model:', error);
+        alert('Failed to switch model');
+    } finally {
+        modelSelect.disabled = false;
+        modelSelect.style.opacity = '1';
+    }
+}
+
+async function loadChatHistory() {
+    try {
+        const response = await fetch(`${API_BASE}/api/history?limit=20`);
+        const data = await response.json();
+
+        if (data.history && data.history.length > 0) {
+            // Clear welcome message
+            clearWelcomeMessage();
+
+            // Display history (oldest first, so reverse)
+            const historyReversed = [...data.history].reverse();
+
+            for (const entry of historyReversed) {
+                // Add user message
+                addMessage('You', entry.user_query, true);
+
+                // Add AI message
+                const personaName = entry.persona_name || 'AI';
+                addMessage(personaName, entry.ai_response, false);
+
+                // Set current persona if not already set
+                if (!currentPersona && entry.persona_name) {
+                    currentPersona = entry.persona_name;
+                    personaSelect.value = entry.persona_name;
+                    enableChat();
+                }
+            }
+
+            scrollToBottom();
+        }
+    } catch (error) {
+        console.error('Failed to load chat history:', error);
+    }
+}
+
+// =============================================
+// Chat Functions
+// =============================================
+
+async function sendMessage(message) {
+    if (!message.trim() || !currentPersona || isStreaming) return;
+
+    // Add user message
+    addMessage('You', message, true);
+    chatInput.value = '';
+    autoResizeTextarea();
+
+    // Create AI message placeholder
+    const aiMessage = addMessage(currentPersona, '', false, true);
+    const bubble = aiMessage.querySelector('.message-bubble');
+
+    isStreaming = true;
+    disableInput();
+
+    try {
+        const response = await fetch(`${API_BASE}/api/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message })
+        });
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let fullText = '';
+        let buffer = '';
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            buffer += decoder.decode(value, { stream: true });
+
+            // Normalize line endings (handle \r\n from Windows)
+            buffer = buffer.replace(/\r\n/g, '\n');
+
+            // Process complete SSE messages (end with double newline)
+            let doubleNewline;
+            while ((doubleNewline = buffer.indexOf('\n\n')) !== -1) {
+                const message = buffer.substring(0, doubleNewline);
+                buffer = buffer.substring(doubleNewline + 2);
+
+                // Parse the SSE message
+                let eventType = '';
+                let eventData = '';
+
+                for (const line of message.split('\n')) {
+                    if (line.startsWith('event:')) {
+                        eventType = line.substring(6).trim();
+                    } else if (line.startsWith('data:')) {
+                        // Keep the space after 'data:' but don't trim - preserve whitespace in tokens
+                        const dataContent = line.substring(5);
+                        // Only remove the single leading space that SSE format adds
+                        eventData = dataContent.startsWith(' ') ? dataContent.substring(1) : dataContent;
+                    }
+                }
+
+                // Handle based on event type
+                if (eventType === 'done' || eventData === '[DONE]') {
+                    const cursor = bubble.querySelector('.streaming-cursor');
+                    if (cursor) cursor.remove();
+                } else if (eventData !== '' && eventData !== '[DONE]') {
+                    // Decode escaped newlines from SSE
+                    const decodedData = eventData.replace(/\\n/g, '\n');
+                    fullText += decodedData;
+                    bubble.innerHTML = formatMessage(fullText) + '<span class="streaming-cursor"></span>';
+                    scrollToBottom();
+                }
+            }
+        }
+
+        // Final update without cursor
+        bubble.innerHTML = formatMessage(fullText);
+
+    } catch (error) {
+        console.error('Chat error:', error);
+        bubble.innerHTML = '<em style="color: #ef4444;">Error: Failed to get response</em>';
+    } finally {
+        isStreaming = false;
+        enableInput();
+        scrollToBottom();
+    }
+}
+
+function addMessage(sender, text, isUser = false, isStreaming = false) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message ${isUser ? 'user' : 'ai'}`;
+
+    const avatar = isUser ? '👤' : '🏛️';
+
+    messageDiv.innerHTML = `
+        <div class="message-avatar">${avatar}</div>
+        <div class="message-content">
+            <div class="message-sender">${sender}</div>
+            <div class="message-bubble">
+                ${isStreaming ? '<span class="streaming-cursor"></span>' : formatMessage(text)}
+            </div>
+        </div>
+    `;
+
+    chatMessages.appendChild(messageDiv);
+    scrollToBottom();
+
+    return messageDiv;
+}
+
+function formatMessage(text) {
+    if (!text) return '';
+
+    // Escape HTML first to prevent XSS
+    let html = text
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+
+    // Code blocks (```)
+    html = html.replace(/```(\w*)\n([\s\S]*?)```/g, (match, lang, code) => {
+        return `<pre><code class="language-${lang}">${code.trim()}</code></pre>`;
+    });
+
+    // Inline code (`)
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // Headers (# ## ###)
+    html = html.replace(/^### (.+)$/gm, '<h4>$1</h4>');
+    html = html.replace(/^## (.+)$/gm, '<h3>$1</h3>');
+    html = html.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+
+    // Bold (**text**)
+    html = html.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+
+    // Italic (*text* or _text_)
+    html = html.replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    html = html.replace(/_([^_]+)_/g, '<em>$1</em>');
+
+    // Bullet lists (- or *)
+    html = html.replace(/^[\-\*] (.+)$/gm, '<li>$1</li>');
+    html = html.replace(/(<li>.*<\/li>\n?)+/g, '<ul>$&</ul>');
+
+    // Numbered lists (1. 2. etc)
+    html = html.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+
+    // Blockquotes (>)
+    html = html.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+
+    // Horizontal rule (---)
+    html = html.replace(/^---$/gm, '<hr>');
+
+    // Paragraphs - split by double newlines
+    const blocks = html.split(/\n\n+/);
+    html = blocks.map(block => {
+        block = block.trim();
+        if (!block) return '';
+        // Don't wrap already-wrapped elements
+        if (block.startsWith('<h') || block.startsWith('<ul') ||
+            block.startsWith('<ol') || block.startsWith('<pre') ||
+            block.startsWith('<blockquote') || block.startsWith('<hr')) {
+            return block;
+        }
+        // Convert single newlines to <br> within paragraphs
+        block = block.replace(/\n/g, '<br>');
+        return `<p>${block}</p>`;
+    }).join('\n');
+
+    return html;
+}
+
+// =============================================
+// UI Helpers
+// =============================================
+
+function enableChat() {
+    chatInput.disabled = false;
+    sendBtn.disabled = false;
+    chatInput.placeholder = `Ask ${currentPersona} a question...`;
+}
+
+function disableInput() {
+    chatInput.disabled = true;
+    sendBtn.disabled = true;
+}
+
+function enableInput() {
+    chatInput.disabled = false;
+    sendBtn.disabled = false;
+    chatInput.focus();
+}
+
+function clearWelcomeMessage() {
+    const welcome = chatMessages.querySelector('.welcome-message');
+    if (welcome) {
+        welcome.remove();
+    }
+}
+
+function scrollToBottom() {
+    chatMessages.scrollTop = chatMessages.scrollHeight;
+}
+
+function autoResizeTextarea() {
+    chatInput.style.height = 'auto';
+    chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + 'px';
+}
+
+// =============================================
+// Event Listeners
+// =============================================
+
+function setupEventListeners() {
+    // Persona selection
+    personaSelect.addEventListener('change', (e) => {
+        selectPersona(e.target.value);
+    });
+
+    // Settings toggles
+    deepModeToggle.addEventListener('change', (e) => {
+        toggleDeepMode(e.target.checked);
+    });
+
+    loggingToggle.addEventListener('change', (e) => {
+        toggleLogging(e.target.checked);
+    });
+
+    clarityModeToggle.addEventListener('change', (e) => {
+        toggleClarityMode(e.target.checked);
+    });
+
+    // Model selection
+    modelSelect.addEventListener('change', (e) => {
+        selectModel(e.target.value);
+    });
+
+    // Chat form submission
+    chatForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        sendMessage(chatInput.value);
+    });
+
+    // Auto-resize textarea
+    chatInput.addEventListener('input', autoResizeTextarea);
+
+    // Enter to send (Shift+Enter for newline)
+    chatInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendMessage(chatInput.value);
+        }
+    });
+}

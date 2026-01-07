@@ -31,14 +31,24 @@
 - [x] **Rich TUI:** Modern CLI with scrollable containers (Textual/Rich)
 - [x] Configuration UI (Settings menu)
 
-## Phase 3: Web UI & App Backend
+## Phase 3: Web UI & App Backend ✅
 
-- [ ] Flask/FastAPI server implementation
-- [ ] Chat Interface (Web)
+- [x] FastAPI server implementation
+- [x] Chat Interface (Web) with SSE streaming
+- [x] Model selector (switch Ollama models at runtime)
+- [x] Chat history persistence
+- [x] **Clarity Mode:** Accessible language toggle (less jargon)
 - [ ] **Dream Mode:** Background worker for past chat analysis
 - [ ] **Commonplace Book:** Insight extraction system
 - [ ] Settings & Configuration Page
 - [ ] API endpoints for Android Bridge
+
+## Phase 3.5: UX Accessibility Features
+
+- [ ] **"Explain This" Button:** Re-query AI to explain complex concepts in simpler terms
+- [ ] **Ctrl+Click Word Lookup:** Select text → AI-generated definition popup
+- [ ] **Follow-up Suggestions:** Auto-suggest clarifying questions after complex responses
+- [ ] **Glossary Sidebar:** Auto-detect uncommon terms with expandable definitions
 
 ## Phase 4: Persona Ecosystem (v2.0)
 
@@ -73,3 +83,17 @@
 
 - [ ] ButtonManager
 - [ ] Waveshare e-ink integration
+
+---
+
+## Technical Notes & Design Decisions
+
+### TTS Stage Direction Filtering (Phase 3)
+
+**Decision:** Use newline-based heuristic to strip roleplay stage directions for TTS.
+
+**Implementation:** `strip_stage_directions()` function in `core.py` removes lines that are *only* `*italicized text*` (stage directions) while preserving inline emphasis like `that's *really* important`.
+
+**Rationale:** Avoids requiring model prompt changes. Works with current persona outputs.
+
+**Fallback:** If edge cases arise, switch to instructing personas to use explicit markup like `[[stage direction]]` for actions.
