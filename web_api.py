@@ -522,9 +522,9 @@ async def start_symposium(request: SymposiumStartRequest):
     if not core:
         raise HTTPException(status_code=503, detail="Core not initialized")
     
-    # Get persona objects
-    persona_a = core.personas.get(request.persona_a)
-    persona_b = core.personas.get(request.persona_b)
+    # Get persona objects using robust lookup
+    persona_a, _ = find_persona(request.persona_a)
+    persona_b, _ = find_persona(request.persona_b)
     
     if not persona_a:
         raise HTTPException(status_code=400, detail=f"Persona A '{request.persona_a}' not found")
