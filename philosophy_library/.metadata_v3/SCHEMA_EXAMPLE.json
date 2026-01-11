@@ -1,0 +1,218 @@
+{
+    "$schema": "https://pg-clean-metadata.org/schema/v1.0.json",
+    "version": "1.0",
+    "_comment": "=== CORE METADATA (Required) ===",
+    "source": {
+        "provider": "Project Gutenberg",
+        "pg_id": "19978",
+        "pg_url": "https://www.gutenberg.org/ebooks/19978",
+        "text_url": "https://www.gutenberg.org/files/19978/19978-0.txt",
+        "format": "text/plain; charset=utf-8",
+        "filename": "19978-0.txt",
+        "file_hash": "sha256:a3d5e8f9c2b1...",
+        "download_date": "2026-01-11T01:00:00Z",
+        "pg_release_date": "1991-11-01",
+        "pg_last_updated": "2018-03-02"
+    },
+    "work": {
+        "title": "Meditations",
+        "title_sort": "Meditations",
+        "author": "Marcus Aurelius (Emperor of Rome)",
+        "author_sort": "Aurelius, Marcus",
+        "author_birth": "121",
+        "author_death": "180",
+        "translator": "George Long",
+        "language": "en",
+        "original_language": "grc",
+        "subjects": [
+            "Ethics",
+            "Philosophy, Ancient",
+            "Stoics"
+        ],
+        "loc_class": "B - Philosophy, Psychology, Religion"
+    },
+    "curation": {
+        "version": "4.0",
+        "method": "exclusion-based",
+        "curator": "auto_curator v4.0",
+        "model": {
+            "name": "qwen3:8b",
+            "provider": "ollama",
+            "temperature": 0.1,
+            "context_window": 16384
+        },
+        "curated_date": "2026-01-11T01:00:00Z",
+        "verified_by": "community",
+        "verification_date": "2026-01-11T06:00:00Z",
+        "confidence_score": 0.95
+    },
+    "_comment": "=== AI PROMPTS (For Reproducibility) ===",
+    "prompts": {
+        "system_message": "You are a text analysis tool. Identify NON-AUTHOR content in the text.",
+        "exclusion_detection": {
+            "template": "Task: Find ALL sections that are NOT written by {author}.\n\nFIND AND LIST (with exact start/end phrases):\n1. \"Translator's Note:\" or \"Translator's Preface\"\n2. \"Editor's Note:\" or \"Editor's Introduction\"\n3. \"[Editor's comment in brackets]\"\n4. \"Introduction by [someone other than {author}]\"\n5. Any section clearly marked as not by the author\n\nFor each found section, return in this format:\nSTART: [exact first 10-20 words]\nEND: [exact last 10-20 words]\nREASON: [why this should be excluded]\n---\n\nIf nothing found, respond with: \"NONE\"\n\nText to analyze:\n{text_chunk}",
+            "variables": {
+                "author": "Marcus Aurelius",
+                "text_chunk_size": 8000
+            }
+        }
+    },
+    "_comment": "=== EXCLUSIONS (What to Skip) ===",
+    "exclusions": [
+        {
+            "id": "excl-001",
+            "type": "header",
+            "start_char": 0,
+            "end_char": 1024,
+            "start_line": 1,
+            "end_line": 45,
+            "reason": "Project Gutenberg header and license",
+            "confidence": 1.0,
+            "detection_method": "structural_pattern"
+        },
+        {
+            "id": "excl-002",
+            "type": "translator_note",
+            "start_char": 23400,
+            "end_char": 24100,
+            "start_line": 450,
+            "end_line": 465,
+            "reason": "Translator's footnote explaining Greek term 'eudaimonia'",
+            "confidence": 0.98,
+            "detection_method": "ai_detected",
+            "start_phrase": "Translator's note: The Greek word",
+            "end_phrase": "meaning in this context.",
+            "preview": "Translator's note: The Greek word 'eudaimonia'..."
+        },
+        {
+            "id": "excl-003",
+            "type": "footnotes",
+            "start_char": 380000,
+            "end_char": 425000,
+            "start_line": 8500,
+            "end_line": 9200,
+            "reason": "Dense footnote block (auto-detected)",
+            "confidence": 1.0,
+            "detection_method": "structural_pattern",
+            "pattern_matched": "^\\s*\\[\\d+\\]"
+        },
+        {
+            "id": "excl-004",
+            "type": "footer",
+            "start_char": 425000,
+            "end_char": 426000,
+            "start_line": 9200,
+            "end_line": 9250,
+            "reason": "Project Gutenberg footer",
+            "confidence": 1.0,
+            "detection_method": "structural_pattern"
+        }
+    ],
+    "_comment": "=== STATISTICS ===",
+    "stats": {
+        "total_chars": 426000,
+        "total_lines": 9250,
+        "excluded_chars": 45600,
+        "excluded_lines": 750,
+        "author_chars": 380400,
+        "author_lines": 8500,
+        "author_percentage": 89.4,
+        "exclusion_count": 4,
+        "exclusion_types": {
+            "header": 1,
+            "footer": 1,
+            "translator_note": 1,
+            "footnotes": 1
+        }
+    },
+    "_comment": "=== VALIDATION ===",
+    "validation": {
+        "schema_version": "1.0",
+        "validated": true,
+        "validation_date": "2026-01-11T01:05:00Z",
+        "checksum": "md5:b2e4f6a8c1d3...",
+        "warnings": [],
+        "errors": []
+    },
+    "_comment": "=== CARTRIDGE INFO (For Bundled Distribution) ===",
+    "cartridge": {
+        "id": "pg-19978-meditations-v1",
+        "bundle_version": "1.0",
+        "includes": [
+            "metadata.json",
+            "text_original.txt",
+            "text_clean.txt",
+            "prompts.txt",
+            "README.md"
+        ],
+        "size_bytes": 426000,
+        "created_date": "2026-01-11T01:10:00Z",
+        "download_url": "https://github.com/pg-clean/cartridges/releases/download/v1.0/pg-19978.zip"
+    },
+    "_comment": "=== EXTENSIBILITY ===",
+    "extensions": {
+        "_comment": "Custom fields added by community - preserved across updates",
+        "custom_tags": [
+            "stoicism",
+            "philosophy",
+            "roman_empire"
+        ],
+        "reading_level": {
+            "flesch_kincaid": 10.5,
+            "difficulty": "moderate"
+        },
+        "sentiment_analysis": {
+            "overall_tone": "contemplative",
+            "emotional_range": "reflective"
+        },
+        "usage_rights": {
+            "public_domain": true,
+            "cc_license": null,
+            "commercial_use": true
+        },
+        "community_notes": [
+            {
+                "user": "scholar_1",
+                "note": "Excellent translation by Long, particularly accurate on Stoic terminology",
+                "date": "2026-01-10"
+            }
+        ]
+    },
+    "_comment": "=== LINKED DATA (For Future Integration) ===",
+    "linked_data": {
+        "wikidata": "Q4077973",
+        "internet_archive": "meditationsofma00marc",
+        "loc": "2006274620",
+        "related_works": [
+            {
+                "pg_id": "4900",
+                "title": "Epictetus - Enchiridion"
+            },
+            {
+                "pg_id": "5200",
+                "title": "Seneca - Letters"
+            }
+        ]
+    },
+    "_comment": "=== CHANGELOG (Track Metadata Evolution) ===",
+    "changelog": [
+        {
+            "version": "1.0",
+            "date": "2026-01-11T01:00:00Z",
+            "changes": [
+                "Initial metadata generation",
+                "Auto-detected 4 exclusion ranges"
+            ],
+            "curator": "auto_curator v4.0"
+        },
+        {
+            "version": "1.1",
+            "date": "2026-01-11T06:00:00Z",
+            "changes": [
+                "Community verification",
+                "Added custom tags"
+            ],
+            "curator": "community_contributor_42"
+        }
+    ]
+}
