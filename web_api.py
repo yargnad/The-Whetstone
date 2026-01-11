@@ -609,6 +609,27 @@ async def symposium_status():
     }
 
 
+class SymposiumInterjectRequest(BaseModel):
+    message: str
+    target: Optional[str] = None # 'a', 'b', or None
+
+
+@app.post("/api/symposium/interject")
+async def symposium_interject(request: SymposiumInterjectRequest):
+    """Inject a moderator/user message into the symposium."""
+    global active_symposium
+    
+    if not active_symposium:
+        raise HTTPException(status_code=400, detail="No active symposium.")
+    
+    if not active_symposium.is_active:
+        raise HTTPException(status_code=400, detail="Symposium has ended.")
+    
+    turn = active_symposium.interject(request.message, target=request.target)
+    
+    return {"success": True, "turn": turn}
+
+
 # --- Main Entry Point ---
 
 if __name__ == "__main__":

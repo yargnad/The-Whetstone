@@ -35,18 +35,47 @@
                 <p class="tagline">Learning to think again</p>
             </div>
 
-            <div class="sidebar-section">
-                <h3 class="section-title">Persona</h3>
-                <select id="persona-select" class="persona-dropdown">
-                    <option value="">Loading personas...</option>
-                </select>
+            <!-- Sidebar Content Container -->
+            <div id="sidebar-content-chat">
+                <div class="sidebar-section">
+                    <h3 class="section-title">Persona</h3>
+                    <select id="persona-select" class="persona-dropdown">
+                        <option value="">Loading personas...</option>
+                    </select>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="section-title">Model</h3>
+                    <select id="model-select" class="persona-dropdown">
+                        <option value="">Loading models...</option>
+                    </select>
+                </div>
             </div>
 
-            <div class="sidebar-section">
-                <h3 class="section-title">Model</h3>
-                <select id="model-select" class="persona-dropdown">
-                    <option value="">Loading models...</option>
-                </select>
+            <div id="sidebar-content-symposium" style="display: none;">
+                <div class="sidebar-section">
+                    <h3 class="section-title">Philosopher A</h3>
+                    <select id="symposium-persona-a" class="persona-dropdown">
+                        <option value="">Select...</option>
+                    </select>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="section-title">Philosopher B</h3>
+                    <select id="symposium-persona-b" class="persona-dropdown">
+                        <option value="">Select...</option>
+                    </select>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="section-title">Topic</h3>
+                    <textarea id="symposium-topic" class="topic-input sidebar-textarea"
+                        placeholder="Enter debate topic..." rows="3"></textarea>
+                </div>
+
+                <div class="sidebar-section">
+                    <button id="symposium-start-btn" class="symposium-btn primary full-width">Start Debate</button>
+                </div>
             </div>
 
             <div class="sidebar-section">
@@ -115,49 +144,65 @@
                 </form>
             </div>
 
-            <!-- Symposium View -->
+            <!-- Symposium View (Town Hall Style) -->
             <div id="view-symposium" class="view-container">
                 <div class="symposium-header">
                     <h2>🏛️ The Symposium</h2>
-                    <p class="symposium-subtitle">Watch two philosophers debate</p>
+                    <p class="symposium-subtitle" id="symposium-status-text">Configure the debate in the sidebar to
+                        begin.</p>
                 </div>
 
-                <div class="symposium-setup" id="symposium-setup">
-                    <div class="symposium-config">
-                        <div class="persona-picker">
-                            <label>Philosopher A</label>
-                            <select id="symposium-persona-a" class="persona-dropdown">
-                                <option value="">Select...</option>
-                            </select>
-                        </div>
-                        <div class="vs-divider">VS</div>
-                        <div class="persona-picker">
-                            <label>Philosopher B</label>
-                            <select id="symposium-persona-b" class="persona-dropdown">
-                                <option value="">Select...</option>
-                            </select>
+                <div class="symposium-arena" id="symposium-arena">
+                    <div class="symposium-messages" id="symposium-messages">
+                        <div class="welcome-message">
+                            <p>Select two philosophers and a topic in the sidebar, then click <strong>Start
+                                    Debate</strong>.</p>
                         </div>
                     </div>
-
-                    <div class="topic-input-container">
-                        <input type="text" id="symposium-topic" class="topic-input"
-                            placeholder="Enter a topic for debate (e.g., 'Is free will an illusion?')">
-                    </div>
-
-                    <button id="symposium-start-btn" class="symposium-btn primary">Start Debate</button>
                 </div>
 
-                <div class="symposium-arena" id="symposium-arena" style="display: none;">
-                    <div class="symposium-topic-display">
-                        <span>Topic:</span> <strong id="symposium-topic-text"></strong>
+                <!-- Symposium Control Footer -->
+                <div class="symposium-footer">
+                    <!-- Control Bar (Next Turn / End) -->
+                    <div class="symposium-controls-bar" id="symposium-active-controls" style="display: none;">
+                        <button id="symposium-next-btn" class="symposium-control-btn primary">
+                            <span>Next Turn</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <path d="M5 12h14M12 5l7 7-7 7" />
+                            </svg>
+                        </button>
+                        <button id="symposium-stop-btn" class="symposium-control-btn secondary">
+                            <span>End Debate</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2">
+                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                            </svg>
+                        </button>
                     </div>
 
-                    <div class="symposium-messages" id="symposium-messages"></div>
+                    <!-- Mediator Input (Mirrors Chat Input) -->
+                    <form id="symposium-form" class="chat-input-container symposium-input-container"
+                        style="display: none;">
+                        <textarea id="symposium-input" class="chat-input" placeholder="Interject as moderator..."
+                            rows="1"></textarea>
 
-                    <div class="symposium-controls">
-                        <button id="symposium-next-btn" class="symposium-btn primary">Next Turn</button>
-                        <button id="symposium-stop-btn" class="symposium-btn secondary">End Debate</button>
-                    </div>
+                        <div class="symposium-actions">
+                            <button type="button" class="action-btn" data-target="a" title="Ask Philosopher A">
+                                <span class="btn-label">A</span>
+                            </button>
+                            <button type="button" class="action-btn" data-target="b" title="Ask Philosopher B">
+                                <span class="btn-label">B</span>
+                            </button>
+                            <button type="submit" class="send-button" title="Ask Both (General Interjection)">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M22 2L11 13"></path>
+                                    <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </form>
                 </div>
             </div>
 

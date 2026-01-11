@@ -35,10 +35,8 @@ const symposiumTopic = document.getElementById('symposium-topic');
 const symposiumStartBtn = document.getElementById('symposium-start-btn');
 const symposiumNextBtn = document.getElementById('symposium-next-btn');
 const symposiumStopBtn = document.getElementById('symposium-stop-btn');
-const symposiumSetup = document.getElementById('symposium-setup');
-const symposiumArena = document.getElementById('symposium-arena');
 const symposiumMessages = document.getElementById('symposium-messages');
-const symposiumTopicText = document.getElementById('symposium-topic-text');
+const symposiumTopicText = document.getElementById('symposium-status-text'); // Reused subtitle for topic
 const personaGrid = document.getElementById('persona-grid');
 
 // DOM Elements - Persona Manager
@@ -565,6 +563,18 @@ function switchView(viewName) {
     document.querySelectorAll('.view-container').forEach(view => {
         view.classList.toggle('active', view.id === `view-${viewName}`);
     });
+
+    // Toggle sidebar content
+    const chatControls = document.getElementById('sidebar-content-chat');
+    const symposiumControls = document.getElementById('sidebar-content-symposium');
+
+    if (viewName === 'symposium') {
+        if (chatControls) chatControls.style.display = 'none';
+        if (symposiumControls) symposiumControls.style.display = 'block';
+    } else {
+        if (chatControls) chatControls.style.display = 'block';
+        if (symposiumControls) symposiumControls.style.display = 'none';
+    }
 }
 
 // =============================================
@@ -586,10 +596,62 @@ function populateSymposiumPersonas() {
     });
 }
 
+const symposiumForm = document.getElementById('symposium-form');
+const symposiumInput = document.getElementById('symposium-input');
+
 function setupSymposium() {
     symposiumStartBtn.addEventListener('click', startSymposium);
     symposiumNextBtn.addEventListener('click', nextSymposiumTurn);
     symposiumStopBtn.addEventListener('click', stopSymposium);
+
+    // Helper for sending interjections
+    const sendInterjection = async (target = null) => {
+        const message = symposiumInput.value.trim();
+        if (!message) return;
+
+        // Add to UI immediately
+        const bubble = createSymposiumBubble('Moderator', 'center');
+        bubble.querySelector('.bubble-text').textContent = message;
+        symposiumMessages.appendChild(bubble);
+        symposiumMessages.scrollTop = symposiumMessages.scrollHeight;
+
+        // Clear input
+        symposiumInput.value = '';
+
+        try {
+            await fetch(`${API_BASE}/api/symposium/interject`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message, target })
+            });
+            // The next turn will handle the response to this interjection
+        } catch (error) {
+            console.error('Failed to interject:', error);
+            bubble.querySelector('.bubble-text').style.color = 'red';
+        }
+    };
+
+    // Handle targeting buttons
+    document.querySelectorAll('.action-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const target = btn.dataset.target || null; // 'a', 'b', or null (for 'Ask Both')
+            sendInterjection(target);
+        });
+    });
+
+    // Enter to submit (defaults to "Ask Both" / Active form submission)
+    symposiumForm.addEventListener('submit', (e) => {
+        e.preventDefault();
+        sendInterjection(null);
+    });
+
+    symposiumInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            sendInterjection(null);
+        }
+    });
 }
 
 async function startSymposium() {
@@ -622,10 +684,14 @@ async function startSymposium() {
 
         if (data.success) {
             symposiumActive = true;
-            symposiumSetup.style.display = 'none';
-            symposiumArena.style.display = 'flex';
-            symposiumTopicText.textContent = topic;
+            statusBackend.textContent = 'Symposium Active'; // Update status
+            if (symposiumTopicText) symposiumTopicText.textContent = `Topic: ${topic}`;
             symposiumMessages.innerHTML = '';
+
+            // Show Arena Controls
+            const controls = document.getElementById('symposium-active-controls');
+            if (controls) controls.style.display = 'flex';
+            if (symposiumForm) symposiumForm.style.display = 'flex';
 
             // Auto-trigger first turn
             nextSymposiumTurn();
@@ -717,7 +783,9 @@ function createSymposiumBubble(speaker, side) {
     bubble.className = `symposium-bubble ${side}`;
     bubble.innerHTML = `
         <div class="speaker">${speaker}</div>
-        <div class="bubble-text"></div>
+        <div class="bubble-content">
+            <div class="bubble-text"></div>
+        </div>
     `;
     return bubble;
 }
@@ -730,8 +798,7 @@ async function stopSymposium() {
     }
 
     symposiumActive = false;
-    symposiumSetup.style.display = 'block';
-    symposiumArena.style.display = 'none';
+    statusBackend.textContent = 'Symposium Ended';
 }
 
 // =============================================
