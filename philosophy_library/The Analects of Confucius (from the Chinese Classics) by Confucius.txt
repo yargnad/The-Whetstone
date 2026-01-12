@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of The Analects of Confucius (from the Chinese Classics)
+The Project Gutenberg eBook of The Analects of Confucius (from the Chinese Classics)
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -48,7 +48,7 @@ notes, prolegomena, and copious indexes
 
 by James Legge
 
----BEGIN AUTHOR TEXT---
+
 IN FIVE VOLUMES
 
 CONFUCIAN ANALECTS
@@ -3209,7 +3209,7 @@ impossible for the character to be established.
 know men.'
 
 
----END AUTHOR TEXT---
+
 
 
 

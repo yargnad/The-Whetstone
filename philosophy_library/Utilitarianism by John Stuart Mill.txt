@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Utilitarianism
+The Project Gutenberg eBook of Utilitarianism
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -63,7 +63,7 @@ CHAPTER V. OF THE CONNEXION BETWEEN JUSTICE AND UTILITY
 
 
 
----BEGIN AUTHOR TEXT---v
+
 UTILITARIANISM.
 
 
@@ -2552,7 +2552,7 @@ evidence which constitutes scientific proof.]]
 
 
 
----END AUTHOR TEXT---
+
 
 
 

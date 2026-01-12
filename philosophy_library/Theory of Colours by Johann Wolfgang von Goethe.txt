@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Goethe's Theory of Colours
+The Project Gutenberg eBook of Goethe's Theory of Colours
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -263,7 +263,7 @@ of Natural and Chemical Philosophy_, p. 59.
 
 
 
----BEGIN AUTHOR TEXT---
+
 PREFACE TO THE FIRST EDITION OF 1810.
 
 
@@ -13293,7 +13293,7 @@ THE END.
 
 
 
----END AUTHOR TEXT---
+
 
 
 

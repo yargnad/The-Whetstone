@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Dhammapada, a Collection of Verses; Being One of the Canonical Books of the Buddhists
+The Project Gutenberg eBook of Dhammapada, a Collection of Verses; Being One of the Canonical Books of the Buddhists
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -79,7 +79,7 @@ Contents
 
 
 
----BEGIN AUTHOR TEXT---
+
 DHAMMAPADA
 
 
@@ -1717,7 +1717,7 @@ heaven and hell, has reached the end of births, is perfect in knowledge,
 a sage, and whose perfections are all perfect.
 
 
----END AUTHOR TEXT---
+
 
 *** END OF THE PROJECT GUTENBERG EBOOK DHAMMAPADA, A COLLECTION OF VERSES; BEING ONE OF THE CANONICAL BOOKS OF THE BUDDHISTS ***
 

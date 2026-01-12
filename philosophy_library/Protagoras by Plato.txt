@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Protagoras
+The Project Gutenberg eBook of Protagoras
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -522,7 +522,7 @@ anticipation of some 'metaphysic of the future,' in which the divided
 elements of human nature are reconciled.
 
 
----BEGIN AUTHOR TEXT---
+
 
 PROTAGORAS
 
@@ -2969,7 +2969,7 @@ to have kept the engagement of which I spoke before, and only tarried
 because I could not refuse the request of the noble Callias. So the
 conversation ended, and we went our way.
 
----END AUTHOR TEXT---
+
 
 
 

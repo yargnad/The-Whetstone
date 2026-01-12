@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of The Antichrist
+The Project Gutenberg eBook of The Antichrist
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -642,7 +642,7 @@ around many a difficulty.
                         H. L. MENCKEN.
 
 
----BEGIN AUTHOR TEXT---
+
 
 PREFACE
 
@@ -3413,7 +3413,7 @@ last?_--_From today?_--The transvaluation of all values!...
 
 
 THE END
----END AUTHOR TEXT---
+
 
 
 

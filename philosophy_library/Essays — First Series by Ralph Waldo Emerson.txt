@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Essays — First Series
+The Project Gutenberg eBook of Essays — First Series
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -24,7 +24,7 @@ Credits: Tony Adam and David Widger
 
 
 
----BEGIN AUTHOR TEXT---
+
 ESSAYS, FIRST SERIES
 
 By Ralph Waldo Emerson
@@ -6881,7 +6881,7 @@ will appear the supplements and continuations of the material creation.
      Next Volume
 
 
----END AUTHOR TEXT---
+
 
 
 

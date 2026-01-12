@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of The Problems of Philosophy
+The Project Gutenberg eBook of The Problems of Philosophy
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -32,7 +32,7 @@ By Bertrand Russell
 
 
 
----BEGIN AUTHOR TEXT---
+
 PREFACE
 
 In the following pages I have confined myself in the main to those
@@ -3982,7 +3982,7 @@ greatness of the universe which philosophy contemplates, the mind also
 is rendered great, and becomes capable of that union with the universe
 which constitutes its highest good.
 
----END AUTHOR TEXT---
+
 
 
 BIBLIOGRAPHICAL NOTE

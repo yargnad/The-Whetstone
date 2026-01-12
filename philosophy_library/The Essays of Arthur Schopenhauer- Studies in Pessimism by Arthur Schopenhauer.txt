@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of The Essays of Arthur Schopenhauer; Studies in Pessimism
+The Project Gutenberg eBook of The Essays of Arthur Schopenhauer; Studies in Pessimism
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -77,7 +77,7 @@ which is just now receiving a good deal of attention among us.
 T.B.S.
 
 
----BEGIN AUTHOR TEXT---
+
 
 ON THE SUFFERINGS OF THE WORLD.
 
@@ -3109,7 +3109,7 @@ people do not get pricked. A man who has some heat in himself prefers
 to remain outside, where he will neither prick other people nor get
 pricked himself.
 
----END AUTHOR TEXT---
+
 
 *** END OF THE PROJECT GUTENBERG EBOOK THE ESSAYS OF ARTHUR SCHOPENHAUER; STUDIES IN PESSIMISM ***
 

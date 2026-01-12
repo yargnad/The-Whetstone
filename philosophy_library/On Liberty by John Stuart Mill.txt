@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of On Liberty
+The Project Gutenberg eBook of On Liberty
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -476,7 +476,7 @@ CHAPTER V.
 APPLICATIONS                                 177
 
 
----BEGIN AUTHOR TEXT---
+
 
 The grand, leading principle, towards which every argument
 unfolded in these pages directly converges, is the absolute and
@@ -4741,7 +4741,7 @@ sacrificed everything, will in the end avail it nothing, for want of the
 vital power which, in order that the machine might work more smoothly,
 it has preferred to banish.
 
----END AUTHOR TEXT---
+
 
 
 

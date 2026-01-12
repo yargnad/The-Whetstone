@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of The Poetics of Aristotle
+The Project Gutenberg eBook of The Poetics of Aristotle
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -92,7 +92,7 @@ Analysis of Contents
 
 
 
----BEGIN AUTHOR TEXT---
+
 ARISTOTLE'S POETICS
 
 
@@ -1623,7 +1623,7 @@ their several kinds and parts, with the number of each and their
 differences; the causes that make a poem good or bad; the objections of
 the critics and the answers to these objections.
 
----END AUTHOR TEXT---
+
 
 
 

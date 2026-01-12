@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Franklin's Way to Wealth; or, "Poor Richard Improved"
+The Project Gutenberg eBook of Franklin's Way to Wealth; or, "Poor Richard Improved"
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -155,7 +155,7 @@ And of most Booksellers in the United Kingdom.
       with neat coloured plates                 1  0
 
 
----BEGIN AUTHOR TEXT---
+
 
 THE
 
@@ -453,7 +453,7 @@ and farther, that "If you will not hear Reason, she will surely rap
 your knuckles," as Poor Richard says.'
 
        *       *       *       *       *
----END AUTHOR TEXT---
+
 Thus the old gentleman ended his harangue. The people heard it, and
 approved the doctrine, and immediately practised the contrary, just as
 if it had been a common sermon; for the auction opened, and they began

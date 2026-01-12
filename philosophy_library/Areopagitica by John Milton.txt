@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Areopagitica
+The Project Gutenberg eBook of Areopagitica
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -29,7 +29,7 @@ Produced by Judith Boss and David Widger
 
 
 
----BEGIN AUTHOR TEXT---
+
 
 AREOPAGITICA
 
@@ -1638,7 +1638,7 @@ wisest men.
 
 
 
----END AUTHOR TEXT---
+
 
 
 

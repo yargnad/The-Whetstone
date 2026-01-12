@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Voltaire's Philosophical Dictionary
+The Project Gutenberg eBook of Voltaire's Philosophical Dictionary
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -204,7 +204,7 @@ WHY?                                                   313
 DECLARATION OF ADMIRERS, QUESTIONERS AND DOUBTERS      315
 
 
----BEGIN AUTHOR TEXT---
+
 
 _ADULTERY_
 
@@ -10053,7 +10053,7 @@ according to the Chaldeans             465102
 according to the Brahmins              780000
 according to the philosophers        infinity
 
----END AUTHOR TEXT---
+
 FOOTNOTES:
 
 [23] The Philosophical Dictionary was first published as "Questions on

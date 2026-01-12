@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of A Defence of Poetry and Other Essays
+The Project Gutenberg eBook of A Defence of Poetry and Other Essays
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -53,7 +53,7 @@ By Percy Bysshe Shelley
    ON THE SYMPOSIUM, OR PREFACE TO THE BANQUET OF PLATO
    A DEFENCE OF POETRY
 
----BEGIN AUTHOR TEXT---
+
 
 
 
@@ -2936,7 +2936,7 @@ THE END
 
 
 
----END AUTHOR TEXT---
+
 
 
 

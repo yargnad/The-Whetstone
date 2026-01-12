@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of The Thoughts of Blaise Pascal
+The Project Gutenberg eBook of The Thoughts of Blaise Pascal
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -444,7 +444,7 @@ PASCAL'S PROFESSION OF FAITH.
                        Renunciation total and sweet.
                                    etc.
 
----BEGIN AUTHOR TEXT---
+
 
 
 _GENERAL INTRODUCTION._
@@ -12827,7 +12827,7 @@ vespers.
 When a strong man armed keepeth his palace, his goods are in peace.
 
 
----END AUTHOR TEXT---
+
 
 _NOTES._
 

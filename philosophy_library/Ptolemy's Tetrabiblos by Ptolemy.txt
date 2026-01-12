@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Ptolemy's Tetrabiblos
+The Project Gutenberg eBook of Ptolemy's Tetrabiblos
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -966,7 +966,7 @@ _Signs of the Zodiac._
     _INFLUENCE OF THE STARS_
 
 
----BEGIN AUTHOR TEXT---
+
 
 BOOK THE FIRST
 
@@ -9675,7 +9675,7 @@ FINIS
 
 [Illustration: _Fig. 3._]
 
----END AUTHOR TEXT---
+
 
 *** END OF THE PROJECT GUTENBERG EBOOK PTOLEMY'S TETRABIBLOS ***
 

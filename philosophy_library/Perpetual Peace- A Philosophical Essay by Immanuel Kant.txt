@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Perpetual Peace: A Philosophical Essay
+The Project Gutenberg eBook of Perpetual Peace: A Philosophical Essay
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -3128,7 +3128,7 @@ duly and expressly protected against all malicious misinterpretation.
 
 
 
----BEGIN AUTHOR TEXT---
+
 _FIRST SECTION_
 
 CONTAINING THE PRELIMINARY ARTICLES OF PERPETUAL PEACE BETWEEN STATES
@@ -5498,7 +5498,7 @@ works out its own solution and, as the periods in which a given
 advance takes place towards the realisation of the ideal of perpetual
 peace will, we hope, become with the passing of time shorter and
 shorter, we must approach ever nearer to this goal.
----END AUTHOR TEXT---
+
 
 
 

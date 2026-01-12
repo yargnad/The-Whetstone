@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of The Golden Sayings of Epictetus, with the Hymn of Cleanthes
+The Project Gutenberg eBook of The Golden Sayings of Epictetus, with the Hymn of Cleanthes
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -255,7 +255,7 @@ CONTENTS
  The Hymn of Cleanthes
 
 
----BEGIN AUTHOR TEXT---
+
 
 I
 
@@ -3104,7 +3104,7 @@ Evermore praising thy works, as is meet for men that shall perish;
 Seeing that none, be he mortal or God, hath privilege nobler
 Than without stint, without stay, to extol Thy Law universal.
 
----END AUTHOR TEXT---
+
 
 
 

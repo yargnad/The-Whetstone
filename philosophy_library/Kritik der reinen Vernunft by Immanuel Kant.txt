@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Kritik der reinen Vernunft
+The Project Gutenberg eBook of Kritik der reinen Vernunft
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -31,7 +31,7 @@ Gerd Bouillon.
 
 
 
----BEGIN AUTHOR TEXT---
+
 Kritik der reinen Vernunft
 von
 Immanuel Kant
@@ -21468,7 +21468,7 @@ Befriedigung zu bringen.
 
 
 
----END AUTHOR TEXT---
+
 
 
 *** END OF THE PROJECT GUTENBERG EBOOK KRITIK DER REINEN VERNUNFT ***

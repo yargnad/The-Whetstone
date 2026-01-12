@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of The Ego and His Own
+The Project Gutenberg eBook of The Ego and His Own
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -568,7 +568,7 @@ text) the titles of the books are translated.
 
 
 
----BEGIN AUTHOR TEXT---
+
 THE EGO AND HIS OWN
 
 
@@ -13371,7 +13371,7 @@ All things are nothing to me.[243]
 
 THE END
 
----END AUTHOR TEXT---
+
 
 
 INDEX

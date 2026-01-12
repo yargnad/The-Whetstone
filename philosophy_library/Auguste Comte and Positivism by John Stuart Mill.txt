@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Auguste Comte and Positivism
+The Project Gutenberg eBook of Auguste Comte and Positivism
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -28,7 +28,7 @@ Credits: Produced by Marc D'Hooghe
 Produced by Marc D'Hooghe
 
 
----BEGIN AUTHOR TEXT---
+
 
 AUGUSTE COMTE AND POSITIVISM
 
@@ -4848,7 +4848,7 @@ vol. 8vo. Paris: 1860.
 
 
 
----END AUTHOR TEXT---
+
 
 
 

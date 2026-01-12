@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of The Letters of Wolfgang Amadeus Mozart — Volume 01
+The Project Gutenberg eBook of The Letters of Wolfgang Amadeus Mozart — Volume 01
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -289,7 +289,7 @@ Latin, although two years previously he had composed a comedy in that
 language,--"Apollo et Hyacinthus." From this study proceeds the first
 letter which is still extant from his hand:--
 
----BEGIN AUTHOR TEXT---
+
 
 1.
 
@@ -8297,7 +8297,7 @@ Mozart, in the middle of March, also received the command to go to
 Vienna. He set off immediately.
 
 END OF VOL. I.
----END AUTHOR TEXT---
+
 
 
 CONTENTS OF VOLUME I. [LETTERS LISTED BY DATE]

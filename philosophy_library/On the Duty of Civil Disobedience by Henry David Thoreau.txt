@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of On the Duty of Civil Disobedience
+The Project Gutenberg eBook of On the Duty of Civil Disobedience
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -32,7 +32,7 @@ Credits: Sameer Parekh
 
  1849, original title: Resistance to Civil Government
 
----BEGIN AUTHOR TEXT---
+
 
 I heartily accept the motto,—“That government is best which governs
 least;” and I should like to see it acted up to more rapidly and
@@ -861,7 +861,7 @@ anywhere seen.
 
 
 
----END AUTHOR TEXT---
+
 
 
 *** END OF THE PROJECT GUTENBERG EBOOK ON THE DUTY OF CIVIL DISOBEDIENCE ***

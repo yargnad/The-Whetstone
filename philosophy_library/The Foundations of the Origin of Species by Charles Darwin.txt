@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of The Foundations of the Origin of Species
+The Project Gutenberg eBook of The Foundations of the Origin of Species
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -968,7 +968,7 @@ EXPLANATION OF SIGNS, &c.
 _Origin_, Ed. vi. refers to the Popular Edition.
 
 
----BEGIN AUTHOR TEXT---
+
 
 PART I.
 
@@ -9319,7 +9319,7 @@ have been evolved.
 
      {525} These four words are added in pencil between the lines.
 
----END AUTHOR TEXT---
+
 
 
 INDEX

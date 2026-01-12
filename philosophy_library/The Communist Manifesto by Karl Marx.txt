@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of The Communist Manifesto
+The Project Gutenberg eBook of The Communist Manifesto
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -44,7 +44,7 @@ Contents
  IV. POSITION OF THE COMMUNISTS IN RELATION TO THE VARIOUS EXISTING OPPOSITION PARTIES
 
 
----BEGIN AUTHOR TEXT---v
+
 
 A spectre is haunting Europe—the spectre of Communism. All the Powers
 of old Europe have entered into a holy alliance to exorcise this
@@ -1432,7 +1432,7 @@ Communistic revolution. The proletarians have nothing to lose but their
 chains. They have a world to win.
 
 WORKING MEN OF ALL COUNTRIES, UNITE!
----END AUTHOR TEXT---
+
 
 
 

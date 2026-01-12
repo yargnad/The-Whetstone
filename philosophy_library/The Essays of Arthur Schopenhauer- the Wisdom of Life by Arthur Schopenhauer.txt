@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of The Essays of Arthur Schopenhauer: the Wisdom of Life
+The Project Gutenberg eBook of The Essays of Arthur Schopenhauer: the Wisdom of Life
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -60,7 +60,7 @@ CONTENTS.
 
 
 
----BEGIN AUTHOR TEXT---
+
 INTRODUCTION.
 
 
@@ -3729,7 +3729,7 @@ philology, history, and the men who deal with the great facts of human
 life, the poet and the philosopher!
 
 
----END AUTHOR TEXT---
+
 
 
 

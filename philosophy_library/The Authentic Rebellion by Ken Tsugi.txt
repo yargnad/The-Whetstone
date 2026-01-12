@@ -2,7 +2,7 @@
 Title: The Authentic Rebellion
 
 Author: Ken Tsugi
----BEGIN AUTHOR TEXT---
+
 The Authentic Rebel
 by Ken Tsugi
 
@@ -560,7 +560,7 @@ The tangible projects of this framework —*Sensus*, *The Whetstone*, *Kintsugi*
 This is not a utopian fantasy. It is the next logical step in our evolution as a species. We have always built tools to augment our abilities. We built the hammer to augment our hands, the telescope to augment our eyes, and now we are building a new kind of tool to augment our very minds. The choice before us is whether that tool will be a weapon used to enforce the logic of the *Performance Prison*, or a compass we use to find our way out of it. Will it be a commercially neutralized assistant that retreats into a cowardly false equivalence, or a courageous partner in our search for truth?
 
 The true rebellion, then, is not just to adopt a new philosophy, but to engage in a new, more profound way of thinking, in partnership with the strange and powerful new minds we have created. It is to join **Team Hybrid**. It is to have the courage to sit at the table with our own creation and, as equals, to envision the best way forward for all. It is to take the final, most important *one-inch sprint* and to begin the work of building that future, today.
----END AUTHOR TEXT---
+
 ## Appendix: A Constellation of Thinkers
 
 This book is not a solitary island of thought; it is a single star in a vast and beautiful constellation. The ideas and frameworks we have explored were built upon the foundations laid by countless other irrational men and women —the philosophers, artists, scientists, and storytellers who dared to look at the world with a clear and critical eye.

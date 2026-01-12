@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Roman Stoicism
+The Project Gutenberg eBook of Roman Stoicism
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -242,7 +242,7 @@ CONTENTS
 
 
 
----BEGIN AUTHOR TEXT---
+
 CHAPTER I.
 
 THE WORLD-RELIGIONS.
@@ -20714,7 +20714,7 @@ anything in excess of this comes from the Evil one[160].’ To the simple
 and the straightforward, who trust themselves because they trust a power
 higher than themselves, the future belongs.
 
----END AUTHOR TEXT---
+
 FOOTNOTES
 
 [1] As to supposed instances to the contrary see Winckler, _Stoicismus_,

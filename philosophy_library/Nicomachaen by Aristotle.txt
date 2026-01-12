@@ -9,7 +9,7 @@ Author: Aristotle
 Translated by W. D. Ross
 
 ----------------------------------------------------------------------
----BEGIN AUTHOR TEXT---
+
 BOOK I
 
 1 
@@ -7723,7 +7723,7 @@ must use, if it is to be at its best. Let us make a beginning of our
 discussion. 
 
 THE END
----END AUTHOR TEXT---
+
 ----------------------------------------------------------------------
 
 Copyright statement:

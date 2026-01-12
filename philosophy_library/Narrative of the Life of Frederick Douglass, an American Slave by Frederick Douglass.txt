@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Narrative of the Life of Frederick Douglass, an American Slave
+The Project Gutenberg eBook of Narrative of the Life of Frederick Douglass, an American Slave
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -512,7 +512,7 @@ respectively. He died in 1895.
 
 
 
----BEGIN AUTHOR TEXT---
+
  CHAPTER I
 
 
@@ -3738,7 +3738,7 @@ LYNN, _Mass., April_ 28, 1845.
 
 THE END
 
----END AUTHOR TEXT---
+
 
 
 

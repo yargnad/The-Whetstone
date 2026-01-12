@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Politics: A Treatise on Government
+The Project Gutenberg eBook of Politics: A Treatise on Government
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -511,7 +511,7 @@ Educators), 1892.
 
 
 
----BEGIN AUTHOR TEXT---
+
 A TREATISE ON GOVERNMENT
 
 
@@ -8999,7 +8999,7 @@ who are grown old. Moreover, if there is any harmony which is proper for
 a child's age, as being at the same time elegant and instructive, as the
 Lydian of all others seems chiefly to be-These then are as it were the
 three boundaries of education, moderation, possibility, and decorum.
----END AUTHOR TEXT---
+
 
 
 

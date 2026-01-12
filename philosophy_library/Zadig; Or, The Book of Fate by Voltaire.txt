@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of Zadig; Or, The Book of Fate
+The Project Gutenberg eBook of Zadig; Or, The Book of Fate
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -71,7 +71,7 @@ _Wales_, in _New Bond-Street_.
 
 MDCCXLIX.
 
----BEGIN AUTHOR TEXT---
+
 
 
 THE
@@ -3131,7 +3131,7 @@ _Zadig_ blest Heav'n for his unexpected Success.
 
 _FINIS._
 
----END AUTHOR TEXT---
+
 
 
   Transcriber's Notes:

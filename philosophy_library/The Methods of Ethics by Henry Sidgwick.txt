@@ -1,4 +1,4 @@
-﻿The Project Gutenberg eBook of The Methods of Ethics
+The Project Gutenberg eBook of The Methods of Ethics
     
 This ebook is for the use of anyone anywhere in the United States and
 most other parts of the world at no cost and with almost no restrictions
@@ -55,7 +55,7 @@ BY THE SAME AUTHOR.
 MACMILLAN AND CO., LTD., LONDON.
 
 
----BEGIN AUTHOR TEXT---
+
 
 THE METHODS OF ETHICS
 
@@ -22505,7 +22505,7 @@ wrongdoing and wrong-doing
 
 
 
----END AUTHOR TEXT---
+
 
 
 
