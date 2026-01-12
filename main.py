@@ -56,7 +56,16 @@ def run_web(host="0.0.0.0", port=8080, ssl_keyfile=None, ssl_certfile=None):
     # Improve display for local binding
     display_host = host
     if host == "0.0.0.0":
-        display_host = "localhost"
+        # If using SSL cert, extract hostname from cert filename
+        if ssl_certfile:
+            cert_basename = os.path.basename(ssl_certfile)
+            # Extract hostname from pattern like "msi.komodo-city.ts.net.crt"
+            if cert_basename.endswith(".crt"):
+                display_host = cert_basename[:-4]  # Remove .crt extension
+            else:
+                display_host = "localhost"
+        else:
+            display_host = "localhost"
         
     print("\n" + "="*50)
     print(f"  THE WHETSTONE - Web Interface")
