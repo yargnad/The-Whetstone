@@ -333,6 +333,39 @@ class SchedulerScreen(Screen):
     .task-item { padding: 1; border-bottom: solid $surface; }
     #new-task-form { layout: vertical; }
     .form-label { margin-top: 1; }
+    
+    /* Symposium Layout - Mimic Dashboard */
+    SymposiumScreen { 
+        layout: grid; 
+        grid-size: 2; 
+        grid-columns: 30 1fr; /* Sidebar width match */
+        grid-rows: 1fr;
+    }
+    #symp-sidebar {
+        background: $panel;
+        border-right: vkey $primary;
+        padding: 1;
+        row-span: 2;
+        width: 100%; 
+        height: 100%;
+        layout: vertical;
+    }
+    #symp-main-area {
+        height: 100%;
+        layout: vertical;
+    }
+    #symp-controls-area {
+        height: auto;
+        border-bottom: solid $primary;
+        padding: 1;
+        layout: horizontal;
+    }
+    .symp-selector-label {
+        background: $accent;
+        color: $text;
+        text-align: center;
+        margin-top: 1;
+    }
     """
     BINDINGS = [("escape", "app.pop_screen", "Back")]
 
@@ -465,24 +498,37 @@ class SymposiumScreen(Screen):
     BINDINGS = [("escape", "app.pop_screen", "Back to Chat")]
 
     def compose(self) -> ComposeResult:
-        with Header():
-            yield Button("← Back", id="btn-symp-back", variant="error", classes="header-back-btn")
-        
-        with Container(id="symp-header-controls"):
-            yield Label("Topic:")
-            yield Input(placeholder="Enter topic (e.g. Justice)", id="symp-topic")
-            yield Button("P1: Select", id="btn-p1-cycle")
-            yield Button("P2: Select", id="btn-p2-cycle")
-            yield Button("Start Debate", id="btn-symp-start", variant="success")
+        # --- SIDEBAR ---
+        with Vertical(id="symp-sidebar"):
+            yield Label("SYMPOSIUM", id="logo")
+            
+            yield Label("CONTROLS", classes="section-title")
+            yield Button("← Back to Chat", id="btn-symp-back", variant="error")
+            
+            yield Label("PERSONA A (Left)", classes="symp-selector-label")
+            yield Button("Select P1", id="btn-p1-cycle", variant="default")
+            
+            yield Label("PERSONA B (Right)", classes="symp-selector-label")
+            yield Button("Select P2", id="btn-p2-cycle", variant="default")
+            
+            yield Label("TOPIC", classes="symp-selector-label")
+            yield Input(placeholder="Topic...", id="symp-topic")
+            
+            yield Button("START DEBATE", id="btn-symp-start", variant="success", classes="form-label")
 
-        with Container(id="symp-container"):
-             # Split View
+        # --- MAIN AREA ---
+        with Vertical(id="symp-main-area"):
+            # Header / Status
+            with Container(id="symp-controls-area"):
+                 yield Label("Ready to Debate.", id="symp-status-label")
+            
+            # Split View Content
             with Horizontal(id="debate-stage"):
                 with Vertical(id="stage-left", classes="stage-col"):
-                    yield Label("PLATO", id="label-p1", classes="stage-name")
+                    yield Label("LEFT SPEAKER", id="label-p1", classes="stage-name")
                     yield ScrollableContainer(id="chat-left")
                 with Vertical(id="stage-right", classes="stage-col"):
-                    yield Label("NIETZSCHE", id="label-p2", classes="stage-name")
+                    yield Label("RIGHT SPEAKER", id="label-p2", classes="stage-name")
                     yield ScrollableContainer(id="chat-right")
             
     def on_mount(self):
@@ -526,6 +572,12 @@ class SymposiumScreen(Screen):
             
             symposium = Symposium(app.core, p1, p2, topic)
             
+            def update_status(msg):
+                try: self.query_one("#symp-status-label", Label).update(msg)
+                except: pass
+
+            app.call_from_thread(update_status, f"🏛️ Debate Started: {topic}")
+            
             # Clear previous chat
             def clear_ui():
                 self.query_one("#chat-left", ScrollableContainer).remove_children()
@@ -533,7 +585,11 @@ class SymposiumScreen(Screen):
             app.call_from_thread(clear_ui)
             
             # Run loop (e.g. 4 rounds)
-            for _ in range(4):
+            ROUND_COUNT = 4
+            for i in range(ROUND_COUNT):
+                # Update Status
+                app.call_from_thread(update_status, f"🗣️ Round {i+1} of {ROUND_COUNT} ({topic})")
+                
                 # Predict speaker
                 if symposium.turn_count % 2 == 0:
                     s_name = p1['name']
@@ -591,8 +647,12 @@ class SymposiumScreen(Screen):
                 
                 # Short pause between turns
                 time.sleep(1)
+
+            app.call_from_thread(update_status, "✅ Debate Concluded.")
+
         except Exception as e:
             logger.exception("Error in start_debate_logic")
+            app.call_from_thread(self.app.notify, f"Error: {e}", severity="error")
 
 
 class WhetstoneTUI(App):

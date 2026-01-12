@@ -1,0 +1,16 @@
+{
+    "name": "The Whetstone",
+    "short_name": "Whetstone",
+    "description": "Your Philosophical AI Companion",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#121212",
+    "theme_color": "#1f2937",
+    "icons": [
+        {
+            "src": "favicon.svg",
+            "sizes": "any",
+            "type": "image/svg+xml"
+        }
+    ]
+}

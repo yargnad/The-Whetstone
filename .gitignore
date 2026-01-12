@@ -48,3 +48,17 @@ ollama-ui-test.md
 # TTS models (download separately)
 *.onnx
 *.onnx.json
+
+# SSL Certificates (security)
+*.crt
+*.key
+
+# External repos
+codepax-cli/
+codex-library/
+
+# Curation cache
+philosophy_library/.metadata*/
+
+# Test files
+*.codex

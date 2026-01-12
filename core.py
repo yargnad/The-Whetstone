@@ -71,6 +71,8 @@ class PhilosopherCore:
         # Load persistent settings from DB
         self.deep_mode = self.db.get_setting("deep_mode", False)
         self.clarity_mode = self.db.get_setting("clarity_mode", False)
+        self.journey_memory_enabled = self.db.get_setting("journey_memory_enabled", True) # Default ON
+        self.ultra_privacy_mode = self.db.get_setting("ultra_privacy_mode", False)
 
         # Initialize
         self._init_backend()
@@ -79,10 +81,77 @@ class PhilosopherCore:
     
     def _load_saved_persona(self):
         """Load the last selected persona from DB."""
+        if self.ultra_privacy_mode: return # Do not restore state in Ultra Privacy
+
         saved_persona_name = self.db.get_setting("current_persona", None)
         if saved_persona_name and saved_persona_name in self.personas:
             self.current_persona = self.personas[saved_persona_name]
             print(f"[CORE] Restored persona: {saved_persona_name}")
+
+    def summarize_and_store_session(self):
+        """Summarize current session and store in Journey Memory."""
+        if self.ultra_privacy_mode: return
+        if not self.journey_memory_enabled: return
+        
+        # Get recent history
+        history = self.db.get_history(limit=20) 
+        if not history: return
+        
+        # Format for synthesis
+        transcript = "\n".join([f"{h['persona_name']}: {h['ai_response']}\nUser: {h['user_query']}" for h in sorted(history, key=lambda x: x['id'])])
+
+        prompt = f"""Summarize the following conversation in 2-3 sentences, focusing on the key topics discussed and the user's interests. This will be used to restore context for the next session.
+        
+        TRANSCRIPT:
+        {transcript}
+        
+        SUMMARY:"""
+        
+        try:
+            summary = self.backend.generate_response(prompt, system_prompt="You are a helpful scribe.")
+            self.db.add_journey_memory(summary_text=summary, persona_name=self.current_persona['name'] if self.current_persona else "Unknown", session_id=self.session_id)
+            print(f"[CORE] Session summarized: {summary}")
+        except Exception as e:
+            logger.error(f"Summarization failed: {e}")
+
+    def chat(self, user_query: str) -> Generator[str, None, None]:
+        """Main chat function."""
+        if not self.backend:
+            yield "Error: Backend not initialized."
+            return
+
+        if not self.current_persona:
+            self.current_persona = list(self.personas.values())[0] if self.personas else {"name": "System", "description": "No personas found.", "prompt": "You are a fallback system."}
+
+        # --- Context Building ---
+        system_prompt = self.current_persona.get("prompt", "")
+        
+        # Journey Memory Injection
+        if self.journey_memory_enabled and not self.ultra_privacy_mode:
+            memories = self.db.get_recent_memories(limit=3)
+            if memories:
+                memory_text = "\n".join([f"- [{m['timestamp'][:10]}] {m['summary_text']}" for m in memories])
+                system_prompt += f"\n\n[PREVIOUSLY ON YOUR JOURNEY]\n{memory_text}\n[End of Context]"
+        
+        # RAG Injection (Conceptual)
+        # rag_context = self._retrieve_context(user_query)
+        # if rag_context: ...
+
+        full_prompt = f"{system_prompt}\n\nUser: {user_query}\n{self.current_persona['name']}:"
+
+        response_buffer = ""
+        for token in self.backend.generate_stream(full_prompt, stop=[f"\nUser:", "\nUser", f"{self.current_persona['name']}:"]):
+            response_buffer += token
+            yield token
+
+        # Persist State (Logging)
+        if not self.ultra_privacy_mode: # Privacy Manager override
+             self.db.log_interaction(
+                persona_name=self.current_persona['name'],
+                user_query=user_query,
+                ai_response=response_buffer,
+                session_id=self.session_id
+             )
 
     def _init_backend(self):
         """Initialize the LLM backend."""
@@ -100,11 +169,63 @@ class PhilosopherCore:
         self.knowledge_base = self._load_knowledge_base()
 
     def _load_personas(self):
-        if not os.path.exists(PERSONAS_PATH):
-            logger.warning(f"Personas config not found at {PERSONAS_PATH}")
-            return {}
-        with open(PERSONAS_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
+        personas = {}
+        # 1. Load Legacy JSON
+        if os.path.exists(PERSONAS_PATH):
+            with open(PERSONAS_PATH, "r", encoding="utf-8") as f:
+                try: personas = json.load(f)
+                except Exception as e: logger.error(f"Error loading personas.json: {e}")
+        
+        # 2. Scan for .codex files
+        codex_files = glob.glob(os.path.join(KNOWLEDGE_BASE_PATH, "*.codex"))
+        import zipfile
+        
+        for codex_path in codex_files:
+            try:
+                with zipfile.ZipFile(codex_path, 'r') as z:
+                    # Check for codex.json
+                    if "codex.json" in z.namelist():
+                        with z.open("codex.json") as m:
+                            manifest = json.load(m)
+                            # Adapter: Codex V2 -> Internal Persona
+                            p_name = manifest.get("meta", {}).get("name", "Unknown Codex")
+                            
+                            # Start with bootstrap instructions as base
+                            p_prompt = manifest.get("bootstrap_instructions", "")
+                            
+                            # Inject Self-Knowledge (Instructions)
+                            instructions = manifest.get("instructions", {})
+                            if instructions:
+                                hint = instructions.get("system_prompt_hint", "")
+                                usage = instructions.get("usage", "")
+                                if hint:
+                                    p_prompt = f"{hint}\n\n{p_prompt}"
+                                if usage:
+                                    p_prompt = f"[SELF-KNOWLEDGE: {usage}]\n\n{p_prompt}"
+                            
+                            # Inject Provenance (Optional - primarily for debugging/transparency)
+                            provenance = manifest.get("provenance", {})
+                            if provenance:
+                                tool = provenance.get("tool", "unknown")
+                                ver = provenance.get("version", "?")
+                                p_prompt += f"\n\n[ORIGIN: Generated by {tool} v{ver}]"
+
+                            # Synthesize layers if present
+                            if "layers" in manifest:
+                                for layer in manifest["layers"]:
+                                    p_prompt += f"\n\n[LAYER: {layer.get('id', 'unknown')}]\n{layer.get('content', '')}"
+                            
+                            personas[p_name] = {
+                                "name": p_name,
+                                "prompt": p_prompt,
+                                "description": manifest.get("meta", {}).get("description", ""),
+                                "source_codex": os.path.basename(codex_path)
+                            }
+                            print(f"[CORE] Loaded Codex: {p_name}")
+            except Exception as e:
+                logger.error(f"Failed to load Codex {codex_path}: {e}")
+                
+        return personas
 
     def _load_knowledge_base(self):
         docs = []

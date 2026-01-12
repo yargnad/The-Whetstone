@@ -40,6 +40,16 @@ class DatabaseManager:
                         updated_at TEXT NOT NULL
                     )
                 ''')
+                # Journey Memory table for session restoration summaries
+                cursor.execute('''
+                    CREATE TABLE IF NOT EXISTS journey_memory (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        timestamp TEXT NOT NULL,
+                        summary_text TEXT NOT NULL,
+                        persona_name TEXT,
+                        session_id TEXT
+                    )
+                ''')
                 conn.commit()
         except Exception as e:
             logger.error(f"Failed to initialize database: {e}")
@@ -113,8 +123,34 @@ class DatabaseManager:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.cursor()
                 cursor.execute('SELECT * FROM interactions ORDER BY id DESC LIMIT ?', (limit,))
-                return [dict(row) for row in cursor.fetchall()]
+            return [dict(row) for row in cursor.fetchall()]
         except Exception as e:
             logger.error(f"Failed to retrieve history: {e}")
+            return []
+
+    def add_journey_memory(self, summary_text, persona_name=None, session_id=None):
+        """Store a session summary for future context restoration."""
+        try:
+            timestamp = datetime.utcnow().isoformat()
+            with sqlite3.connect(self.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO journey_memory (timestamp, summary_text, persona_name, session_id)
+                    VALUES (?, ?, ?, ?)
+                ''', (timestamp, summary_text, persona_name, session_id))
+                conn.commit()
+        except Exception as e:
+            logger.error(f"Failed to add journey memory: {e}")
+
+    def get_recent_memories(self, limit=5):
+        """Retrieve recent journey memories for context injection."""
+        try:
+            with sqlite3.connect(self.db_path) as conn:
+                conn.row_factory = sqlite3.Row
+                cursor = conn.cursor()
+                cursor.execute('SELECT * FROM journey_memory ORDER BY id DESC LIMIT ?', (limit,))
+                return [dict(row) for row in cursor.fetchall()]
+        except Exception as e:
+            logger.error(f"Failed to retrieve memories: {e}")
             return []
 
