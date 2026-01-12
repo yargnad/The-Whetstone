@@ -143,6 +143,66 @@ body {
     box-shadow: 0 0 0 3px var(--accent-glow);
 }
 
+/* Input Group Row (Select + Button) */
+.input-group-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+/* Star/Icon Button */
+.icon-btn {
+    background: transparent;
+    border: 1px solid var(--border-subtle);
+    border-radius: 8px;
+    color: var(--text-muted);
+    cursor: pointer;
+    font-size: 1.1rem;
+    padding: 8px 10px;
+    transition: all var(--transition-fast);
+    line-height: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 40px;
+}
+
+.icon-btn:hover {
+    background: var(--bg-elevated);
+    color: var(--accent-secondary);
+    border-color: var(--border-accent);
+}
+
+.icon-btn.star-btn:hover {
+    color: #fbbf24;
+    /* Amber-400 for stars */
+    border-color: #fbbf24;
+}
+
+.icon-btn.start-btn:hover {
+    border-color: #22c55e;
+    /* Green */
+    background: rgba(34, 197, 94, 0.1);
+}
+
+.icon-btn.stop-btn:hover {
+    border-color: #ef4444;
+    /* Red */
+    background: rgba(239, 68, 68, 0.1);
+}
+
+.icon-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: var(--border-subtle);
+    background: transparent;
+    filter: grayscale(0.5);
+}
+
+.icon-btn:active {
+    transform: scale(0.95);
+}
+
 /* Toggle Switch */
 .toggle-row {
     display: flex;
@@ -760,9 +820,6 @@ body {
     margin-bottom: 0;
 }
 
-color: var(--text-primary);
-box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-}
 
 .symposium-bubble.left .bubble-content {
     border-bottom-left-radius: 4px;
@@ -1154,6 +1211,54 @@ box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* =============================================
+   Symposium Controls
+   ============================================= */
+
+.symposium-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.action-btn {
+    width: 42px;
+    height: 42px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: 10px;
+    color: var(--text-muted);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.action-btn:hover {
+    background: var(--bg-tertiary);
+    border-color: var(--border-accent);
+    color: var(--text-primary);
+    transform: translateY(-1px);
+}
+
+.action-btn .btn-label {
+    font-size: 0.9rem;
+}
+
+/* Big Submit Button overrides */
+.send-button.primary-action {
+    background: var(--accent-primary);
+    width: 52px;
+    height: 52px;
+}
+
+.send-button.primary-action:hover {
+    background: var(--accent-secondary);
+    box-shadow: 0 4px 12px var(--accent-glow);
+}
+
+/* =============================================
    Responsive
    ============================================= */
 
@@ -1195,3 +1300,72 @@ box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
         margin: 8px 0;
     }
 }
+
+/* =============================================
+   Privacy Manager
+   ============================================= */
+
+.privacy-content {
+    padding: 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    max-width: 800px;
+    margin: 0 auto;
+    width: 100%;
+}
+
+.privacy-card {
+    background: var(--bg-elevated);
+    border: 1px solid var(--border-subtle);
+    border-radius: 12px;
+    padding: 24px;
+    transition: all var(--transition-fast);
+}
+
+.privacy-card:hover {
+    border-color: var(--accent-primary);
+    transform: translateY(-2px);
+}
+
+.privacy-card h3 {
+    color: var(--text-primary);
+    margin-bottom: 8px;
+    font-size: 1.1rem;
+}
+
+.privacy-card p {
+    color: var(--text-secondary);
+    margin-bottom: 20px;
+    line-height: 1.5;
+}
+
+.privacy-card.danger {
+    border-color: rgba(239, 68, 68, 0.3);
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.privacy-card.danger:hover {
+    border-color: #ef4444;
+}
+
+.privacy-card.danger h3 {
+    color: #ef4444;
+}
+
+.danger-text {
+    color: #ef4444;
+    font-weight: 600;
+}
+
+/* Toggle Row Large Override */
+.toggle-row.large {
+    font-size: 1rem;
+    padding: 12px 0;
+    border-top: 1px solid var(--border-subtle);
+}
+
+.toggle-row.large span {
+    font-weight: 500;
+}
+

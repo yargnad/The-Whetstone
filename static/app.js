@@ -12,6 +12,8 @@ let currentModel = null;
 let isStreaming = false;
 let currentView = 'chat';
 let symposiumActive = false;
+let currentSymposiumA = null;
+let currentSymposiumB = null;
 
 // DOM Elements - Chat
 const personaSelect = document.getElementById('persona-select');
@@ -19,6 +21,12 @@ const modelSelect = document.getElementById('model-select');
 const deepModeToggle = document.getElementById('deep-mode-toggle');
 const clarityModeToggle = document.getElementById('clarity-mode-toggle');
 const loggingToggle = document.getElementById('logging-toggle');
+const privacyLoggingToggle = document.getElementById('privacy-logging-toggle'); // Duplicate for Privacy View
+const privacyMemoryToggle = document.getElementById('privacy-memory-toggle');
+const privacyUltraToggle = document.getElementById('privacy-ultra-toggle');
+const setDefaultPersonaBtn = document.getElementById('set-default-persona-btn');
+const setDefaultModelBtn = document.getElementById('set-default-model-btn');
+const logger = console; // Alias for consistency
 const chatMessages = document.getElementById('chat-messages');
 const chatForm = document.getElementById('chat-form');
 const chatInput = document.getElementById('chat-input');
@@ -33,8 +41,9 @@ const symposiumPersonaA = document.getElementById('symposium-persona-a');
 const symposiumPersonaB = document.getElementById('symposium-persona-b');
 const symposiumTopic = document.getElementById('symposium-topic');
 const symposiumStartBtn = document.getElementById('symposium-start-btn');
-const symposiumNextBtn = document.getElementById('symposium-next-btn');
 const symposiumStopBtn = document.getElementById('symposium-stop-btn');
+const symposiumSubmitBtn = document.getElementById('symposium-submit-btn');
+// symposiumNextBtn removed
 const symposiumMessages = document.getElementById('symposium-messages');
 const symposiumTopicText = document.getElementById('symposium-status-text'); // Reused subtitle for topic
 const personaGrid = document.getElementById('persona-grid');
@@ -49,6 +58,8 @@ const personaPrompt = document.getElementById('persona-prompt');
 const modalCloseBtn = document.getElementById('modal-close-btn');
 const modalSelectBtn = document.getElementById('modal-select-btn');
 const modalSaveBtn = document.getElementById('modal-save-btn');
+const modalExportBtn = document.getElementById('modal-export-btn');
+const exportAllBtn = document.getElementById('export-all-btn');
 
 // Status elements
 const statusBackend = document.getElementById('status-backend');
@@ -500,7 +511,78 @@ function setupEventListeners() {
 
     loggingToggle.addEventListener('change', (e) => {
         toggleLogging(e.target.checked);
+        if (privacyLoggingToggle) privacyLoggingToggle.checked = e.target.checked;
     });
+
+    if (privacyLoggingToggle) {
+        privacyLoggingToggle.addEventListener('change', (e) => {
+            toggleLogging(e.target.checked);
+            loggingToggle.checked = e.target.checked;
+        });
+    }
+
+    if (privacyMemoryToggle) {
+        privacyMemoryToggle.addEventListener('change', async (e) => {
+            try {
+                await fetch(`${API_BASE}/api/settings/journey-memory`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: e.target.checked })
+                });
+            } catch (error) { logger.error('Failed to toggle memory:', error); }
+        });
+    }
+
+    if (privacyUltraToggle) {
+        privacyUltraToggle.addEventListener('change', async (e) => {
+            try {
+                await fetch(`${API_BASE}/api/settings/ultra-privacy`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: e.target.checked })
+                });
+                // Ultra privacy usually force-disables others visually
+                if (e.target.checked) {
+                    loggingToggle.checked = false;
+                    loggingToggle.disabled = true;
+                    if (privacyLoggingToggle) { privacyLoggingToggle.checked = false; privacyLoggingToggle.disabled = true; }
+                    if (privacyMemoryToggle) { privacyMemoryToggle.checked = false; privacyMemoryToggle.disabled = true; }
+                } else {
+                    loggingToggle.disabled = false;
+                    if (privacyLoggingToggle) privacyLoggingToggle.disabled = false;
+                    if (privacyMemoryToggle) privacyMemoryToggle.disabled = false;
+                }
+            } catch (error) { logger.error('Failed to toggle ultra privacy:', error); }
+        });
+    }
+
+    if (setDefaultPersonaBtn) {
+        setDefaultPersonaBtn.addEventListener('click', async () => {
+            if (!currentPersona) return;
+            try {
+                await fetch(`${API_BASE}/api/settings/default-persona`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ persona_name: currentPersona })
+                });
+                alert(`Saved '${currentPersona}' as default.`);
+            } catch (error) { logger.error('Failed to set default:', error); }
+        });
+    }
+
+    if (setDefaultModelBtn) {
+        setDefaultModelBtn.addEventListener('click', async () => {
+            if (!currentModel) return;
+            try {
+                await fetch(`${API_BASE}/api/settings/default-model`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ model_name: currentModel })
+                });
+                alert(`Saved '${currentModel}' as default.`);
+            } catch (error) { logger.error('Failed to set default model:', error); }
+        });
+    }
 
     clarityModeToggle.addEventListener('change', (e) => {
         toggleClarityMode(e.target.checked);
@@ -601,8 +683,8 @@ const symposiumInput = document.getElementById('symposium-input');
 
 function setupSymposium() {
     symposiumStartBtn.addEventListener('click', startSymposium);
-    symposiumNextBtn.addEventListener('click', nextSymposiumTurn);
     symposiumStopBtn.addEventListener('click', stopSymposium);
+    // Next button functionality merged into form submit
 
     // Helper for sending interjections
     const sendInterjection = async (target = null) => {
@@ -617,6 +699,7 @@ function setupSymposium() {
 
         // Clear input
         symposiumInput.value = '';
+        if (symposiumSubmitBtn) symposiumSubmitBtn.title = "Next Turn (Leave empty)";
 
         try {
             await fetch(`${API_BASE}/api/symposium/interject`, {
@@ -624,7 +707,8 @@ function setupSymposium() {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message, target })
             });
-            // The next turn will handle the response to this interjection
+            // Auto-trigger the next turn to respond to the interjection
+            nextSymposiumTurn();
         } catch (error) {
             console.error('Failed to interject:', error);
             bubble.querySelector('.bubble-text').style.color = 'red';
@@ -643,13 +727,29 @@ function setupSymposium() {
     // Enter to submit (defaults to "Ask Both" / Active form submission)
     symposiumForm.addEventListener('submit', (e) => {
         e.preventDefault();
-        sendInterjection(null);
+        const text = symposiumInput.value.trim();
+        if (!text) {
+            // Empty input acts as "Next Turn"
+            nextSymposiumTurn();
+        } else {
+            sendInterjection(null);
+        }
     });
 
     symposiumInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             sendInterjection(null);
+        }
+    });
+
+    // Dynamic Tooltip Logic
+    symposiumInput.addEventListener('input', () => {
+        const text = symposiumInput.value.trim();
+        if (text) {
+            symposiumSubmitBtn.title = "Ask Both (General Interjection)";
+        } else {
+            symposiumSubmitBtn.title = "Next Turn (Leave empty)";
         }
     });
 }
@@ -684,13 +784,19 @@ async function startSymposium() {
 
         if (data.success) {
             symposiumActive = true;
+            // Store speaker names for stable alignment
+            currentSymposiumA = personaA;
+            currentSymposiumB = personaB;
+
             statusBackend.textContent = 'Symposium Active'; // Update status
             if (symposiumTopicText) symposiumTopicText.textContent = `Topic: ${topic}`;
             symposiumMessages.innerHTML = '';
 
-            // Show Arena Controls
-            const controls = document.getElementById('symposium-active-controls');
-            if (controls) controls.style.display = 'flex';
+            // Disable start, enable stop
+            symposiumStartBtn.disabled = true;
+            symposiumStopBtn.disabled = false;
+
+            // Show Arena Controls form only (control bar removed)
             if (symposiumForm) symposiumForm.style.display = 'flex';
 
             // Auto-trigger first turn
@@ -705,8 +811,9 @@ async function startSymposium() {
 async function nextSymposiumTurn() {
     if (!symposiumActive) return;
 
-    symposiumNextBtn.disabled = true;
-    symposiumNextBtn.textContent = 'Thinking...';
+    if (!symposiumActive) return;
+
+    // Visual feedback on form submit button could be added here if desired
 
     try {
         const response = await fetch(`${API_BASE}/api/symposium/next`);
@@ -740,7 +847,11 @@ async function nextSymposiumTurn() {
                         const dataContent = line.substring(5);
                         eventData = dataContent.startsWith(' ') ? dataContent.substring(1) : dataContent;
                     } else if (line.startsWith('id:')) {
-                        // Extract speaker from turn info if needed
+                        // Extract speaker from ID field (sent with every token)
+                        const idContent = line.substring(3).trim();
+                        if (idContent && !idContent.startsWith('turn-')) {
+                            currentSpeaker = idContent;
+                        }
                     }
                 }
 
@@ -749,10 +860,12 @@ async function nextSymposiumTurn() {
                     fullText += decodedData;
 
                     if (!bubble) {
-                        // Create bubble - determine side based on turn count
-                        const turnCount = symposiumMessages.children.length;
-                        const side = turnCount % 2 === 0 ? 'left' : 'right';
-                        bubble = createSymposiumBubble('', side);
+                        // Create bubble with correct alignment immediately
+                        let side = 'center';
+                        if (currentSpeaker === currentSymposiumA) side = 'left';
+                        else if (currentSpeaker === currentSymposiumB) side = 'right';
+
+                        bubble = createSymposiumBubble(currentSpeaker || '...', side);
                         symposiumMessages.appendChild(bubble);
                     }
 
@@ -763,6 +876,16 @@ async function nextSymposiumTurn() {
                     currentSpeaker = eventData;
                     if (bubble) {
                         bubble.querySelector('.speaker').textContent = currentSpeaker;
+
+                        // Fix alignment now that we know the speaker
+                        bubble.classList.remove('left', 'right', 'center');
+                        if (currentSpeaker === currentSymposiumA) {
+                            bubble.classList.add('left');
+                        } else if (currentSpeaker === currentSymposiumB) {
+                            bubble.classList.add('right');
+                        } else {
+                            bubble.classList.add('center');
+                        }
                     }
                 } else if (eventType === 'done') {
                     // Turn complete
@@ -772,9 +895,6 @@ async function nextSymposiumTurn() {
 
     } catch (error) {
         console.error('Symposium turn error:', error);
-    } finally {
-        symposiumNextBtn.disabled = false;
-        symposiumNextBtn.textContent = 'Next Turn';
     }
 }
 
@@ -792,13 +912,27 @@ function createSymposiumBubble(speaker, side) {
 
 async function stopSymposium() {
     try {
-        await fetch(`${API_BASE}/api/symposium/stop`, { method: 'POST' });
+        const response = await fetch(`${API_BASE}/api/symposium/stop`, { method: 'POST' });
+        const data = await response.json();
+
+        if (data.success) {
+            symposiumActive = false;
+            statusBackend.textContent = 'Symposium Ended';
+
+            // Re-enable start, disable stop
+            symposiumStartBtn.disabled = false;
+            symposiumStopBtn.disabled = true;
+
+            const bubble = createSymposiumBubble('System', 'center');
+            bubble.innerHTML = `<em>Debate ended. ${data.turns} turns recorded.</em>`;
+            symposiumMessages.appendChild(bubble);
+
+            if (symposiumForm) symposiumForm.style.display = 'none';
+        }
+
     } catch (error) {
         console.error('Failed to stop symposium:', error);
     }
-
-    symposiumActive = false;
-    statusBackend.textContent = 'Symposium Ended';
 }
 
 // =============================================
@@ -871,6 +1005,16 @@ function setupPersonaManager() {
     // Modal save button
     if (modalSaveBtn) {
         modalSaveBtn.addEventListener('click', savePersonaPreamble);
+    }
+
+    // Modal export button
+    if (modalExportBtn) {
+        modalExportBtn.addEventListener('click', exportPersonaCodex);
+    }
+
+    // Export All button
+    if (exportAllBtn) {
+        exportAllBtn.addEventListener('click', exportAllCodex);
     }
 
     // Close modal on outside click
@@ -967,5 +1111,82 @@ async function savePersonaPreamble() {
     } finally {
         btn.disabled = false;
         btn.textContent = 'Save Changes';
+    }
+}
+
+async function exportPersonaCodex() {
+    if (!currentEditingPersona) return;
+
+    const btn = modalExportBtn;
+    btn.disabled = true;
+    btn.textContent = '⏳ Exporting...';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/personas/${encodeURIComponent(currentEditingPersona)}/export`, {
+            method: 'GET'
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${currentEditingPersona}.codex`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } else {
+            const data = await response.json();
+            alert('Export failed: ' + (data.detail || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Export failed:', error);
+        alert('Failed to export persona: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '📦 Export CODEX';
+    }
+}
+
+async function exportAllCodex() {
+    const btn = exportAllBtn;
+    btn.disabled = true;
+    btn.textContent = '⏳ Exporting All...';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/personas/export-all`, {
+            method: 'GET'
+        });
+
+        if (response.ok) {
+            const blob = await response.blob();
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+
+            // Get filename from Content-Disposition header or use default
+            const contentDisposition = response.headers.get('Content-Disposition');
+            let filename = 'all_personas.zip';
+            if (contentDisposition) {
+                const match = contentDisposition.match(/filename="?(.+)"?/);
+                if (match) filename = match[1];
+            }
+
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } else {
+            const data = await response.json();
+            alert('Export failed: ' + (data.detail || 'Unknown error'));
+        }
+    } catch (error) {
+        console.error('Export all failed:', error);
+        alert('Failed to export personas: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '📦 Export All as CODEX';
     }
 }

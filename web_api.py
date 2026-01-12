@@ -244,6 +244,121 @@ async def update_persona_config(persona_name: str, request: PersonaConfigRequest
     return {"success": True, "persona": persona.get("name")}
 
 
+@app.get("/api/personas/{persona_name}/export")
+async def export_persona_codex(persona_name: str):
+    """Export a single persona as a CODEX file."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    
+    persona, _ = find_persona(persona_name)
+    if not persona:
+        raise HTTPException(status_code=404, detail=f"Persona '{persona_name}' not found")
+    
+    try:
+        import json
+        from fastapi.responses import Response
+        
+        # Get custom preamble if it exists
+        custom_preamble = core.db.get_setting(f"persona_preamble_{persona.get('name')}", "")
+        
+        # Create CODEX structure
+        codex_data = {
+            "format": "codex/persona",
+            "version": "1.0",
+            "metadata": {
+                "name": persona.get("name"),
+                "description": persona.get("description", ""),
+                "created": "manual_export"
+            },
+            "layers": {
+                "core": {
+                    "system_prompt": persona.get("prompt", ""),
+                    "custom_preamble": custom_preamble,
+                    "library_filter": persona.get("library_filter", [])
+                }
+            }
+        }
+        
+        # Convert to JSON
+        codex_json = json.dumps(codex_data, indent=2)
+        
+        # Return as downloadable file
+        return Response(
+            content=codex_json,
+            media_type="application/json",
+            headers={
+                "Content-Disposition": f'attachment; filename="{persona.get("name")}.codex"'
+            }
+        )
+    except Exception as e:
+        logger.error(f"Export failed for {persona_name}: {e}")
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+
+
+@app.get("/api/personas/export-all")
+async def export_all_personas_codex():
+    """Export all personas as a ZIP archive of CODEX files."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    
+    try:
+        import json
+        import io
+        import zipfile
+        from fastapi.responses import StreamingResponse
+        
+        personas = core.get_valid_personas()
+        if not personas:
+            raise HTTPException(status_code=404, detail="No personas found")
+        
+        # Create ZIP in memory
+        zip_buffer = io.BytesIO()
+        
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            for persona in personas:
+                # Get custom preamble if it exists
+                custom_preamble = core.db.get_setting(f"persona_preamble_{persona.get('name')}", "")
+                
+                # Create CODEX structure for this persona
+                codex_data = {
+                    "format": "codex/persona",
+                    "version": "1.0",
+                    "metadata": {
+                        "name": persona.get("name"),
+                        "description": persona.get("description", ""),
+                        "created": "manual_export"
+                    },
+                    "layers": {
+                        "core": {
+                            "system_prompt": persona.get("prompt", ""),
+                            "custom_preamble": custom_preamble,
+                            "library_filter": persona.get("library_filter", [])
+                        }
+                    }
+                }
+                
+                # Add to ZIP
+                codex_json = json.dumps(codex_data, indent=2)
+                filename = f"{persona.get('name')}.codex"
+                zip_file.writestr(filename, codex_json)
+        
+        # Seek to beginning of buffer
+        zip_buffer.seek(0)
+        
+        # Return as streaming response
+        return StreamingResponse(
+            io.BytesIO(zip_buffer.read()),
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f'attachment; filename="whetstone_personas.zip"'
+            }
+        )
+    except Exception as e:
+        logger.error(f"Export all failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+
+
+
 @app.post("/api/personas/scan")
 async def scan_personas(deep: bool = False):
     """
@@ -412,6 +527,48 @@ async def toggle_clarity_mode(request: SettingsRequest):
     return {"clarity_mode": core.clarity_mode}
 
 
+@app.post("/api/settings/ultra-privacy")
+async def toggle_ultra_privacy(request: SettingsRequest):
+    """Toggle Ultra-Privacy Mode (disables all logging and restoration)."""
+    if not core: raise HTTPException(status_code=503, detail="Core")
+    core.ultra_privacy_mode = request.enabled
+    core.db.set_setting("ultra_privacy_mode", request.enabled)
+    return {"ultra_privacy_mode": core.ultra_privacy_mode}
+
+
+@app.post("/api/settings/journey-memory")
+async def toggle_journey_memory(request: SettingsRequest):
+    """Toggle Journey Memory (session restoration)."""
+    if not core: raise HTTPException(status_code=503, detail="Core")
+    core.journey_memory_enabled = request.enabled
+    core.db.set_setting("journey_memory_enabled", request.enabled)
+    return {"journey_memory_enabled": core.journey_memory_enabled}
+
+
+@app.post("/api/settings/default-persona")
+async def set_default_persona(request: PersonaSelectRequest):
+    """Set the current persona as the default for future sessions."""
+    if not core: raise HTTPException(status_code=503, detail="Core")
+    core.db.set_setting("current_persona", request.persona_name)
+    return {"success": True, "default_persona": request.persona_name}
+
+
+@app.post("/api/settings/default-model")
+async def set_default_model(request: ModelSelectRequest):
+    """Set the current model as the default for future sessions."""
+    if not core: raise HTTPException(status_code=503, detail="Core")
+    core.db.set_setting("default_model", request.model_name)
+    return {"success": True, "default_model": request.model_name}
+
+
+@app.post("/api/memory/summarize")
+async def trigger_summarization():
+    """Manually trigger session summarization (e.g., on exit)."""
+    if not core: raise HTTPException(status_code=503, detail="Core")
+    core.summarize_and_store_session()
+    return {"success": True}
+        
+    
 # --- Model Endpoints ---
 
 @app.get("/api/models")
@@ -561,7 +718,7 @@ async def symposium_next_turn():
                     yield {
                         "event": "token", 
                         "data": encoded,
-                        "id": f"turn-{active_symposium.turn_count}"
+                        "id": event.get("speaker", "System")
                     }
                 elif event["type"] == "complete":
                     yield {

@@ -5,7 +5,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Whetstone</title>
+    <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
     <meta name="description" content="Cognitive Strengthening - Learning to think again">
+    <link rel="manifest" href="/static/manifest.json">
     <link rel="stylesheet" href="/static/style.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -27,6 +29,7 @@
                             <button class="menu-item" data-view="symposium">🏛️ Symposium</button>
                             <div class="menu-divider"></div>
                             <button class="menu-item" data-view="personas">📚 Persona Manager</button>
+                            <button class="menu-item" data-view="privacy">🛡️ Privacy Manager</button>
                             <button class="menu-item" data-view="scheduler">⏰ Scheduler</button>
                         </div>
                     </div>
@@ -39,16 +42,24 @@
             <div id="sidebar-content-chat">
                 <div class="sidebar-section">
                     <h3 class="section-title">Persona</h3>
-                    <select id="persona-select" class="persona-dropdown">
-                        <option value="">Loading personas...</option>
-                    </select>
+                    <div class="input-group-row">
+                        <select id="persona-select" class="persona-dropdown">
+                            <option value="">Loading personas...</option>
+                        </select>
+                        <button id="set-default-persona-btn" class="icon-btn star-btn"
+                            title="Set this persona as default for future sessions">⭐</button>
+                    </div>
                 </div>
 
                 <div class="sidebar-section">
                     <h3 class="section-title">Model</h3>
-                    <select id="model-select" class="persona-dropdown">
-                        <option value="">Loading models...</option>
-                    </select>
+                    <div class="input-group-row">
+                        <select id="model-select" class="persona-dropdown">
+                            <option value="">Loading models...</option>
+                        </select>
+                        <button id="set-default-model-btn" class="icon-btn star-btn"
+                            title="Set this model as default for future sessions">⭐</button>
+                    </div>
                 </div>
             </div>
 
@@ -73,8 +84,11 @@
                         placeholder="Enter debate topic..." rows="3"></textarea>
                 </div>
 
-                <div class="sidebar-section">
-                    <button id="symposium-start-btn" class="symposium-btn primary full-width">Start Debate</button>
+                <div class="sidebar-section control-row" style="display: flex; gap: 10px;">
+                    <button id="symposium-start-btn" class="icon-btn start-btn" title="Start Debate"
+                        style="flex: 1; justify-content: center;">🟢</button>
+                    <button id="symposium-stop-btn" class="icon-btn stop-btn" title="End Debate"
+                        style="flex: 1; justify-content: center;" disabled>🏁</button>
                 </div>
             </div>
 
@@ -164,22 +178,6 @@
                 <!-- Symposium Control Footer -->
                 <div class="symposium-footer">
                     <!-- Control Bar (Next Turn / End) -->
-                    <div class="symposium-controls-bar" id="symposium-active-controls" style="display: none;">
-                        <button id="symposium-next-btn" class="symposium-control-btn primary">
-                            <span>Next Turn</span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <path d="M5 12h14M12 5l7 7-7 7" />
-                            </svg>
-                        </button>
-                        <button id="symposium-stop-btn" class="symposium-control-btn secondary">
-                            <span>End Debate</span>
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                stroke-width="2">
-                                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                            </svg>
-                        </button>
-                    </div>
 
                     <!-- Mediator Input (Mirrors Chat Input) -->
                     <form id="symposium-form" class="chat-input-container symposium-input-container"
@@ -188,18 +186,19 @@
                             rows="1"></textarea>
 
                         <div class="symposium-actions">
+                            <button type="submit" id="symposium-submit-btn" class="send-button primary-action"
+                                title="Next Turn (Leave empty)">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2">
+                                    <path d="M22 2L11 13"></path>
+                                    <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
+                                </svg>
+                            </button>
                             <button type="button" class="action-btn" data-target="a" title="Ask Philosopher A">
                                 <span class="btn-label">A</span>
                             </button>
                             <button type="button" class="action-btn" data-target="b" title="Ask Philosopher B">
                                 <span class="btn-label">B</span>
-                            </button>
-                            <button type="submit" class="send-button" title="Ask Both (General Interjection)">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                                    stroke-width="2">
-                                    <path d="M22 2L11 13"></path>
-                                    <path d="M22 2L15 22L11 13L2 9L22 2Z"></path>
-                                </svg>
                             </button>
                         </div>
                     </form>
@@ -223,6 +222,7 @@
                             </select>
                         </label>
                         <button id="scan-personas-btn" class="toolbar-btn">🔄 Scan for Personas</button>
+                        <button id="export-all-btn" class="toolbar-btn">📦 Export All as CODEX</button>
                     </div>
                 </div>
 
@@ -249,9 +249,49 @@
                             </div>
                         </div>
                         <div class="modal-footer">
-                            <button id="modal-select-btn" class="symposium-btn primary">Select Persona</button>
-                            <button id="modal-save-btn" class="symposium-btn secondary">Save Changes</button>
+                            <button id="modal-select-btn" class="toolbar-btn">Select Persona</button>
+                            <button id="modal-export-btn" class="toolbar-btn">📦 Export CODEX</button>
+                            <button id="modal-save-btn" class="toolbar-btn">Save Changes</button>
                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Privacy Manager View -->
+            <div id="view-privacy" class="view-container">
+                <div class="view-header">
+                    <h2>🛡️ Privacy Manager</h2>
+                    <p>Manage data persistence, logging, and memory settings.</p>
+                </div>
+                <div class="privacy-content">
+                    <div class="privacy-card">
+                        <h3>Logged Interaction History</h3>
+                        <p>Enables gamification and long-term evolutionary traits.</p>
+                        <label class="toggle-row large">
+                            <span>Enable Chat Logging</span>
+                            <input type="checkbox" id="privacy-logging-toggle" class="toggle-input">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="privacy-card">
+                        <h3>Journey Memory</h3>
+                        <p>Summarizes sessions to restore context on next launch (Session Continuity).</p>
+                        <label class="toggle-row large">
+                            <span>Enable Journey Memory</span>
+                            <input type="checkbox" id="privacy-memory-toggle" class="toggle-input">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="privacy-card danger">
+                        <h3>Ultra-Privacy Mode</h3>
+                        <p>Disables ALL logging and persistence. No data saved to disk.</p>
+                        <label class="toggle-row large">
+                            <span class="danger-text">Enable Ultra-Privacy</span>
+                            <input type="checkbox" id="privacy-ultra-toggle" class="toggle-input">
+                            <span class="toggle-slider"></span>
+                        </label>
                     </div>
                 </div>
             </div>
