@@ -393,8 +393,6 @@ async def run_scan_task(deep: bool):
     
     script_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "codepax-cli",
-        "tools",
         "generate_personas.py"
     )
     
