@@ -56,6 +56,11 @@ ollama-ui-test.md
 # External repos
 codepax-cli/
 codex-library/
+codex_library/
+
+# CODEX artifacts
+*.codex
+*.codex.json
 
 # Curation cache
 philosophy_library/.metadata*/
