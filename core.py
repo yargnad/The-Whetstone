@@ -4,6 +4,8 @@ import logging
 import uuid
 import glob
 import re
+import shutil
+import zipfile
 from typing import Optional, Generator, Dict, List
 
 from database import DatabaseManager
@@ -16,6 +18,11 @@ logger = logging.getLogger(__name__)
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 PERSONAS_PATH = os.path.join(PROJECT_DIR, "philosophy_library", "personas.json")
 KNOWLEDGE_BASE_PATH = os.path.join(PROJECT_DIR, "philosophy_library")
+# Primary CODEX libraries (categorized) - prefer single canonical path
+CODEX_LIBRARY_ROOTS = [
+    os.path.join(PROJECT_DIR, "codex_library"),
+    KNOWLEDGE_BASE_PATH,  # legacy fallback
+]
 
 
 def strip_stage_directions(text: str) -> str:
@@ -73,11 +80,106 @@ class PhilosopherCore:
         self.clarity_mode = self.db.get_setting("clarity_mode", False)
         self.journey_memory_enabled = self.db.get_setting("journey_memory_enabled", True) # Default ON
         self.ultra_privacy_mode = self.db.get_setting("ultra_privacy_mode", False)
+        self.autogen_personas = self.db.get_setting("autogen_personas", True)
+        self.pending_personas = set(self.db.get_setting("pending_personas", []))
+        self.default_chat_model = self.db.get_setting("chat_model", os.getenv("WHETSTONE_MODEL", "cogito:8b"))
 
         # Initialize
+        self._organize_codex_library()
         self._init_backend()
         self.refresh_data()
         self._load_saved_persona()
+        self._ensure_default_persona()
+
+    def _save_pending(self):
+        try:
+            self.db.set_setting("pending_personas", list(self.pending_personas))
+        except Exception as e:
+            logger.warning(f"[CORE] Failed to persist pending personas: {e}")
+
+    def is_persona_pending(self, name: str) -> bool:
+        return name.lower() in {p.lower() for p in self.pending_personas}
+
+    def mark_persona_pending(self, name: str):
+        self.pending_personas.add(name)
+        self._save_pending()
+        key = name.strip().lower()
+        if key in self.personas:
+            self.personas[key]["pending"] = True
+
+    def mark_persona_ready(self, name: str):
+        if name in self.pending_personas:
+            self.pending_personas.remove(name)
+            self._save_pending()
+        key = name.strip().lower()
+        if key in self.personas:
+            self.personas[key]["pending"] = False
+
+    def generate_persona(self, persona_name: str):
+        """Placeholder generation hook. In real flow, run curator then mark ready."""
+        self.mark_persona_ready(persona_name)
+
+    def _ensure_default_persona(self):
+        """Guarantee that a persona is selected so chat endpoints don't 400."""
+        if not self.current_persona:
+            valid = self.get_valid_personas()
+            if valid:
+                self.set_persona(valid[0])
+                logger.info(f"[CORE] Defaulted persona to {valid[0].get('name')}")
+
+    def _organize_codex_library(self):
+        """Reorganize CODEX files into category subfolders and move legacy files.
+
+        - Moves any .codex from legacy 'codex-library' into the canonical 'codex_library'.
+        - Ensures .codex files at the root of codex_library are placed into a category folder
+          (defaults to 'philosophy').
+        - If a CODEx has no category, place it into 'unsupported'.
+        """
+        canonical_root = os.path.join(PROJECT_DIR, "codex_library")
+        legacy_root = os.path.join(PROJECT_DIR, "codex-library")
+
+        os.makedirs(canonical_root, exist_ok=True)
+
+        def move_into_root(src_path: str):
+            try:
+                dest_path = os.path.join(canonical_root, os.path.basename(src_path))
+                if os.path.abspath(src_path) == os.path.abspath(dest_path):
+                    return dest_path
+                if not os.path.exists(dest_path):
+                    shutil.move(src_path, dest_path)
+                    logger.info(f"[CORE] Moved legacy CODEX into canonical library: {os.path.basename(src_path)}")
+                return dest_path
+            except Exception as e:
+                logger.warning(f"[CORE] Failed moving legacy CODEX {src_path}: {e}")
+                return src_path
+
+        # 1) Move legacy files into canonical root
+        if os.path.exists(legacy_root):
+            for path in glob.glob(os.path.join(legacy_root, "*.codex")):
+                move_into_root(path)
+
+        # 2) Place root-level codex files into category subfolders
+        for path in glob.glob(os.path.join(canonical_root, "*.codex")):
+            category = "philosophy"
+            try:
+                with zipfile.ZipFile(path, 'r') as z:
+                    if "codex.json" in z.namelist():
+                        with z.open("codex.json") as m:
+                            manifest = json.load(m)
+                        meta = manifest.get("meta", {})
+                        category = meta.get("category") or "philosophy"
+            except Exception:
+                category = "unsupported"
+
+            dest_dir = os.path.join(canonical_root, category)
+            os.makedirs(dest_dir, exist_ok=True)
+            dest_path = os.path.join(dest_dir, os.path.basename(path))
+            if os.path.abspath(path) != os.path.abspath(dest_path):
+                try:
+                    shutil.move(path, dest_path)
+                    logger.info(f"[CORE] Sorted CODEX into category '{category}': {os.path.basename(path)}")
+                except Exception as e:
+                    logger.warning(f"[CORE] Failed to sort CODEX {path}: {e}")
     
     def _load_saved_persona(self):
         """Load the last selected persona from DB."""
@@ -157,11 +259,23 @@ class PhilosopherCore:
         """Initialize the LLM backend."""
         try:
             print("[CORE] Initializing LLM Backend...")
-            self.backend = create_backend()
+            self.backend = create_backend(model=self.default_chat_model)
             print(f"[CORE] Backend ready: {self.backend.name}")
         except Exception as e:
             logger.error(f"Failed to initialize backend: {e}")
             print(f"[CORE] Error initializing backend: {e}")
+
+    def set_chat_model(self, model_name: str):
+        """Switch the active chat/symposium model and persist it."""
+        if not model_name:
+            return
+        self.default_chat_model = model_name
+        self.db.set_setting("chat_model", model_name)
+        try:
+            self.backend = create_backend(model=model_name)
+            logger.info(f"[CORE] Chat model set to {model_name}")
+        except Exception as e:
+            logger.error(f"[CORE] Failed to switch model to {model_name}: {e}")
 
     def refresh_data(self):
         """Reload personas and knowledge base."""
@@ -176,54 +290,91 @@ class PhilosopherCore:
                 try: personas = json.load(f)
                 except Exception as e: logger.error(f"Error loading personas.json: {e}")
         
-        # 2. Scan for .codex files
-        codex_files = glob.glob(os.path.join(KNOWLEDGE_BASE_PATH, "*.codex"))
-        import zipfile
-        
-        for codex_path in codex_files:
+        # 2. Scan categorized CODEX libraries (supports nested folders)
+        def load_codex_file(codex_path: str, category: str):
             try:
                 with zipfile.ZipFile(codex_path, 'r') as z:
-                    # Check for codex.json
-                    if "codex.json" in z.namelist():
-                        with z.open("codex.json") as m:
-                            manifest = json.load(m)
-                            # Adapter: Codex V2 -> Internal Persona
-                            p_name = manifest.get("meta", {}).get("name", "Unknown Codex")
-                            
-                            # Start with bootstrap instructions as base
-                            p_prompt = manifest.get("bootstrap_instructions", "")
-                            
-                            # Inject Self-Knowledge (Instructions)
-                            instructions = manifest.get("instructions", {})
-                            if instructions:
-                                hint = instructions.get("system_prompt_hint", "")
-                                usage = instructions.get("usage", "")
-                                if hint:
-                                    p_prompt = f"{hint}\n\n{p_prompt}"
-                                if usage:
-                                    p_prompt = f"[SELF-KNOWLEDGE: {usage}]\n\n{p_prompt}"
-                            
-                            # Inject Provenance (Optional - primarily for debugging/transparency)
-                            provenance = manifest.get("provenance", {})
-                            if provenance:
-                                tool = provenance.get("tool", "unknown")
-                                ver = provenance.get("version", "?")
-                                p_prompt += f"\n\n[ORIGIN: Generated by {tool} v{ver}]"
+                    if "codex.json" not in z.namelist():
+                        return
+                    with z.open("codex.json") as m:
+                        manifest = json.load(m)
+                # Adapter: Codex V2 -> Internal Persona
+                meta = manifest.get("meta", {}) or {}
+                work = manifest.get("work", {}) or {}
 
-                            # Synthesize layers if present
-                            if "layers" in manifest:
-                                for layer in manifest["layers"]:
-                                    p_prompt += f"\n\n[LAYER: {layer.get('id', 'unknown')}]\n{layer.get('content', '')}"
-                            
-                            personas[p_name] = {
-                                "name": p_name,
-                                "prompt": p_prompt,
-                                "description": manifest.get("meta", {}).get("description", ""),
-                                "source_codex": os.path.basename(codex_path)
-                            }
-                            print(f"[CORE] Loaded Codex: {p_name}")
+                # Determine persona name (author-first). Fallbacks: meta.author -> first of meta.authors -> work.author -> filename tail.
+                author = meta.get("author")
+                if not author and meta.get("authors"):
+                    if isinstance(meta.get("authors"), list) and meta["authors"]:
+                        first_auth = meta["authors"][0]
+                        if isinstance(first_auth, str):
+                            author = first_auth
+                        elif isinstance(first_auth, dict):
+                            author = first_auth.get("name") or first_auth.get("author")
+                if not author:
+                    author = work.get("author") or work.get("author_sort")
+                if not author:
+                    # Heuristic: use the filename tail as author
+                    fname = os.path.splitext(os.path.basename(codex_path))[0]
+                    tail = fname.split("-")[-1]
+                    author = tail.replace("_", " ").replace("-", " ").title()
+
+                p_name = author
+                # Start with bootstrap instructions as base
+                p_prompt = manifest.get("bootstrap_instructions", "") or ""
+
+                # Inject Self-Knowledge (Instructions)
+                instructions = manifest.get("instructions", {})
+                if instructions:
+                    hint = instructions.get("system_prompt_hint", "")
+                    usage = instructions.get("usage", "")
+                    if hint:
+                        p_prompt = f"{hint}\n\n{p_prompt}"
+                    if usage:
+                        p_prompt = f"[SELF-KNOWLEDGE: {usage}]\n\n{p_prompt}"
+
+                # Inject Provenance (Optional - primarily for debugging/transparency)
+                provenance = manifest.get("provenance", {})
+                if provenance:
+                    tool = provenance.get("tool", "unknown")
+                    ver = provenance.get("version", "?")
+                    p_prompt += f"\n\n[ORIGIN: Generated by {tool} v{ver}]"
+
+                # Synthesize layers if present
+                if "layers" in manifest:
+                    for layer in manifest["layers"]:
+                        p_prompt += f"\n\n[LAYER: {layer.get('id', 'unknown')}]\n{layer.get('content', '')}"
+
+                persona_pending = self.is_persona_pending(p_name) or (not p_prompt.strip())
+
+                # De-duplicate by author name: first codex wins; later ones skipped (could be expanded to merge works)
+                persona_key = p_name.strip().lower()
+                if persona_key not in personas:
+                    personas[persona_key] = {
+                        "name": p_name,
+                        "prompt": p_prompt,
+                        "description": meta.get("description", meta.get("title", "")) or work.get("title", ""),
+                        "source_codex": os.path.basename(codex_path),
+                        "source_path": codex_path,
+                        "category": category or meta.get("category", "philosophy"),
+                        "library_filter": meta.get("library_filter", []),
+                        "pending": persona_pending,
+                    }
+                    print(f"[CORE] Loaded Codex: {p_name} [{category or meta.get('category', 'philosophy')}]")
+                else:
+                    logger.info(f"[CORE] Skipped duplicate author persona: {p_name} from {os.path.basename(codex_path)}")
             except Exception as e:
                 logger.error(f"Failed to load Codex {codex_path}: {e}")
+
+        for root in CODEX_LIBRARY_ROOTS:
+            if not os.path.exists(root):
+                continue
+            for codex_path in glob.glob(os.path.join(root, "**", "*.codex"), recursive=True):
+                rel = os.path.relpath(codex_path, root)
+                parts = rel.split(os.sep)
+                # If stored directly under root, default to philosophy (main scope)
+                category = parts[0] if len(parts) > 1 else "philosophy"
+                load_codex_file(codex_path, category)
                 
         return personas
 

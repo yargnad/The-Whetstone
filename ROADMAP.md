@@ -47,8 +47,23 @@
 
 - [ ] **"Explain This" Button:** Re-query AI to explain complex concepts in simpler terms
 - [ ] **Ctrl+Click Word Lookup:** Select text → AI-generated definition popup
+- [ ] **CODEX Verification Tools**: Utilities to validate CODEX file integrity and schema compliance.
 - [ ] **Follow-up Suggestions:** Auto-suggest clarifying questions after complex responses
 - [ ] **Glossary Sidebar:** Auto-detect uncommon terms with expandable definitions
+
+## CODEX 2.0 & Beyond: The Agentic Workflow Vision
+
+### CODEX as Executable Workflows
+Transform CODEX files from static data containers into self-executing agentic workflows.
+- **Workflow Definitions**: files containing data, logic, prompts, and rules for executing complex series of actions.
+- **Self-Management**: "Out-of-the-box" assistant capabilities where opening a file instructs the AI how to handle the entire context.
+- **Automation Integration**: Embedded shell scripting and automation hooks (with user approval safety layers).
+
+### Codepax Plugin Architecture
+Evolve `codepax` into a package manager for AI workflows and personas, supported by an extensible plugin system.
+- **Plugin System**: Allow third-party tools (like The Whetstone) to extend `codepax` functionality.
+- **Custom Hydration**: Plugins can provide logic for building, hydrating, and parsing specialized CODEX types.
+- **Helper Integration**: "Helpers" that assist in constructing complex CODEX files or fetching remote resources.
 
 ## Phase 4: Persona Ecosystem (v2.0)
 

@@ -14,9 +14,13 @@ let currentView = 'chat';
 let symposiumActive = false;
 let currentSymposiumA = null;
 let currentSymposiumB = null;
+let generationPollTimer = null;
+let configState = {};
+let availableModels = [];
 
 // DOM Elements - Chat
 const personaSelect = document.getElementById('persona-select');
+const personaReloadBtn = document.getElementById('persona-reload-btn');
 const modelSelect = document.getElementById('model-select');
 const deepModeToggle = document.getElementById('deep-mode-toggle');
 const clarityModeToggle = document.getElementById('clarity-mode-toggle');
@@ -26,6 +30,10 @@ const privacyMemoryToggle = document.getElementById('privacy-memory-toggle');
 const privacyUltraToggle = document.getElementById('privacy-ultra-toggle');
 const setDefaultPersonaBtn = document.getElementById('set-default-persona-btn');
 const setDefaultModelBtn = document.getElementById('set-default-model-btn');
+const autogenToggle = document.getElementById('autogen-toggle');
+const generationStatus = document.getElementById('generation-status');
+const generationStatusText = document.getElementById('generation-status-text');
+const generationProgressBar = document.getElementById('generation-progress-bar');
 const logger = console; // Alias for consistency
 const chatMessages = document.getElementById('chat-messages');
 const chatForm = document.getElementById('chat-form');
@@ -61,6 +69,23 @@ const modalSaveBtn = document.getElementById('modal-save-btn');
 const modalExportBtn = document.getElementById('modal-export-btn');
 const exportAllBtn = document.getElementById('export-all-btn');
 
+// Config Manager Elements
+const configStartupView = document.getElementById('config-startup-view');
+const configDefaultPersonaChat = document.getElementById('config-default-persona-chat');
+const configDefaultPersonaSymposium = document.getElementById('config-default-persona-symposium');
+const configDefaultPersonaSymposiumB = document.getElementById('config-default-persona-symposium-b');
+const configChatModel = document.getElementById('config-chat-model');
+const configSymposiumModel = document.getElementById('config-symposium-model');
+const configPersonaModel = document.getElementById('config-persona-model');
+const configCuratorModel = document.getElementById('config-curator-model');
+const configSslCert = document.getElementById('config-ssl-cert');
+const configSslKey = document.getElementById('config-ssl-key');
+const configVulkanToggle = document.getElementById('config-vulkan-toggle');
+const configChorusToggle = document.getElementById('config-chorus-toggle');
+const configSaveBtn = document.getElementById('config-save-btn');
+const configSaveStatus = document.getElementById('config-save-status');
+const symposiumModelSelect = document.getElementById('symposium-model-select');
+
 // Status elements
 const statusBackend = document.getElementById('status-backend');
 const statusPersonas = document.getElementById('status-personas');
@@ -77,6 +102,7 @@ async function init() {
     await loadStatus();
     await loadPersonas();
     await loadModels();
+    await loadConfig();
     await loadChatHistory();
     populateSymposiumPersonas();
     populatePersonaGrid();
@@ -101,6 +127,7 @@ async function loadStatus() {
         deepModeToggle.checked = data.deep_mode || false;
         clarityModeToggle.checked = data.clarity_mode || false;
         loggingToggle.checked = data.logging_enabled || false;
+        if (autogenToggle) autogenToggle.checked = data.autogen_personas ?? true;
 
         if (data.current_persona) {
             currentPersona = data.current_persona;
@@ -121,7 +148,12 @@ async function loadPersonas() {
         data.personas.forEach(persona => {
             const option = document.createElement('option');
             option.value = persona.name;
-            option.textContent = persona.name;
+            const emoji = getCategoryEmoji(persona.category);
+            const pendingLabel = persona.pending ? ' ⏳' : '';
+            option.textContent = `${emoji} ${persona.name}${pendingLabel}`;
+            option.dataset.category = persona.category || '';
+            option.dataset.description = persona.description || '';
+            option.dataset.pending = persona.pending ? 'true' : 'false';
             if (persona.name === data.current) {
                 option.selected = true;
                 currentPersona = persona.name;
@@ -136,8 +168,199 @@ async function loadPersonas() {
     }
 }
 
+async function loadConfig() {
+    try {
+        const resp = await fetch(`${API_BASE}/api/config`);
+        const data = await resp.json();
+        configState = data.config || {};
+
+        // Populate inputs
+        if (configStartupView) configStartupView.value = configState.startup_view || 'chat';
+        if (configChatModel) configChatModel.value = configState.chat_model || configChatModel.value;
+        if (configSymposiumModel) configSymposiumModel.value = configState.symposium_model || configSymposiumModel.value;
+        if (configPersonaModel) configPersonaModel.value = configState.persona_model || configPersonaModel.value;
+        if (configCuratorModel) configCuratorModel.value = configState.curator_model || configCuratorModel.value;
+        if (configSslCert) configSslCert.value = configState.ssl_cert || '';
+        if (configSslKey) configSslKey.value = configState.ssl_key || '';
+        if (configVulkanToggle) configVulkanToggle.checked = !!configState.vulkan_enabled;
+        if (configChorusToggle) configChorusToggle.checked = !!configState.chorus_enabled;
+
+        populateConfigPersonas();
+
+        // Apply startup view preference once on load
+        if (configState.startup_view) {
+            switchView(configState.startup_view);
+        }
+
+        // Sync symposium model dropdown
+        if (symposiumModelSelect && configState.symposium_model) {
+            const opt = [...symposiumModelSelect.options].find(o => o.value === configState.symposium_model);
+            if (opt) opt.selected = true;
+        }
+
+        // Set current model from config if available
+        if (configState.chat_model) {
+            currentModel = configState.chat_model;
+            const opt = [...modelSelect.options].find(o => o.value === currentModel);
+            if (opt) opt.selected = true;
+        }
+            // Rebuild model dropdowns now that we have config defaults
+            await loadModels();
+    } catch (error) {
+        console.error('Failed to load config:', error);
+    }
+}
+
+async function saveConfig() {
+    const payload = {
+        startup_view: configStartupView ? configStartupView.value : 'chat',
+        chat_model: configChatModel?.value || '',
+        symposium_model: configSymposiumModel?.value || '',
+        persona_model: configPersonaModel?.value || '',
+        curator_model: configCuratorModel?.value || '',
+        default_persona_chat: configDefaultPersonaChat?.value || '',
+        default_persona_symposium: configDefaultPersonaSymposium?.value || '',
+        default_persona_symposium_b: configDefaultPersonaSymposiumB?.value || '',
+        ssl_cert: configSslCert?.value || '',
+        ssl_key: configSslKey?.value || '',
+        vulkan_enabled: configVulkanToggle?.checked || false,
+        chorus_enabled: configChorusToggle?.checked || false,
+    };
+
+    try {
+        configSaveBtn.disabled = true;
+        configSaveStatus.textContent = 'Saving...';
+        const resp = await fetch(`${API_BASE}/api/config`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload),
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data.success) throw new Error(data.detail || 'Save failed');
+        const oldConfig = configState || {};
+        configState = data.config || payload;
+        const restartNeeded = (
+            (payload.ssl_cert && payload.ssl_cert !== oldConfig.ssl_cert) ||
+            (payload.ssl_key && payload.ssl_key !== oldConfig.ssl_key) ||
+            (payload.vulkan_enabled !== oldConfig.vulkan_enabled)
+        );
+        configSaveStatus.textContent = restartNeeded ? 'Saved (restart recommended for SSL/Vulkan changes)' : 'Saved';
+
+        // Update current model selection in UI if changed
+        if (configState.chat_model) {
+            currentModel = configState.chat_model;
+            const opt = [...modelSelect.options].find(o => o.value === currentModel);
+            if (opt) opt.selected = true;
+        }
+
+        // Keep symposium dropdown in sync after save
+        if (symposiumModelSelect && configState.symposium_model) {
+            const opt = [...symposiumModelSelect.options].find(o => o.value === configState.symposium_model);
+            if (opt) opt.selected = true;
+        }
+    } catch (err) {
+        console.error('Failed to save config:', err);
+        configSaveStatus.textContent = 'Error saving';
+        alert('Failed to save configuration.');
+    } finally {
+        setTimeout(() => { configSaveStatus.textContent = ''; }, 1500);
+        configSaveBtn.disabled = false;
+    }
+}
+
+function getCategoryEmoji(category) {
+    const key = (category || '').toLowerCase();
+    const map = {
+        philosophy: '🏛️',
+        fiction: '📖',
+        history: '🗿', // historical figures/works
+        science: '🔬',
+        religion: '⛪',
+        poetry: '🪶',
+        essays: '🧭',
+        biography: '👤',
+    };
+    return map[key] || map['philosophy'] || '📚';
+}
+
+async function reloadPersonas() {
+    if (!personaReloadBtn) return;
+    const originalLabel = personaReloadBtn.textContent;
+    personaReloadBtn.disabled = true;
+    personaReloadBtn.textContent = '...';
+
+    try {
+        const response = await fetch(`${API_BASE}/api/personas/reload`, { method: 'POST' });
+        if (!response.ok) {
+            const detail = await response.json().catch(() => ({}));
+            throw new Error(detail?.detail || `Reload failed (HTTP ${response.status})`);
+        }
+        await loadPersonas();
+        populateSymposiumPersonas();
+        populatePersonaGrid();
+        await loadStatus();
+    } catch (error) {
+        console.error('Failed to reload personas:', error);
+        alert('Failed to reload personas. Check server logs.');
+    } finally {
+        personaReloadBtn.disabled = false;
+        personaReloadBtn.textContent = originalLabel;
+    }
+}
+
+function updateGenerationStatus(text, progress, visible = true) {
+    if (!generationStatus || !generationStatusText || !generationProgressBar) return;
+    generationStatus.style.display = visible ? 'block' : 'none';
+    if (text) generationStatusText.textContent = text;
+    if (typeof progress === 'number') {
+        const pct = Math.max(0, Math.min(100, Math.round(progress * 100)));
+        generationProgressBar.style.width = `${pct}%`;
+    }
+}
+
+async function pollGenerationStatus(onDone) {
+    try {
+        const resp = await fetch(`${API_BASE}/api/personas/generation/status`);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+        const data = await resp.json();
+        if (data.is_running) {
+            updateGenerationStatus(`Generating ${data.persona_name || ''}…`, data.progress ?? 0.1, true);
+            generationPollTimer = setTimeout(() => pollGenerationStatus(onDone), 1000);
+            return;
+        }
+
+        if (data.success) {
+            updateGenerationStatus('Generation complete.', 1, true);
+            await reloadPersonas();
+        } else if (data.error) {
+            updateGenerationStatus(`Generation failed: ${data.error}`, 1, true);
+        } else {
+            updateGenerationStatus('Generation finished.', 1, true);
+        }
+
+        if (onDone) onDone(data);
+        generationPollTimer = setTimeout(() => updateGenerationStatus('', 0, false), 1200);
+    } catch (err) {
+        console.error('Poll generation status failed:', err);
+        updateGenerationStatus('Generation status unavailable', 0, true);
+        generationPollTimer = setTimeout(() => updateGenerationStatus('', 0, false), 1500);
+    }
+}
+
 async function selectPersona(name) {
     if (!name) return;
+
+    // If persona is marked pending and auto-gen is disabled, prompt user
+    const opt = [...personaSelect.options].find(o => o.value === name);
+    const isPending = opt && opt.dataset.pending === 'true';
+    const autogenEnabled = autogenToggle ? autogenToggle.checked : true;
+    if (isPending && !autogenEnabled) {
+        const proceed = confirm('This persona is pending generation. Generate it now?');
+        if (!proceed) return;
+        await triggerPersonaGeneration(name);
+    }
+
+    const previous = currentPersona || personaSelect.value;
 
     try {
         const response = await fetch(`${API_BASE}/api/personas/select`, {
@@ -146,14 +369,42 @@ async function selectPersona(name) {
             body: JSON.stringify({ persona_name: name })
         });
 
+        if (!response.ok) {
+            const detail = await response.json().catch(() => ({}));
+            const message = detail?.detail || `Failed to select persona (HTTP ${response.status})`;
+            alert(message);
+            personaSelect.value = previous;
+            return;
+        }
+
         const data = await response.json();
         if (data.success) {
-            currentPersona = name;
+            currentPersona = data.persona || name;
+            personaSelect.value = currentPersona;
             enableChat();
             clearWelcomeMessage();
+            chatInput.placeholder = `Ask ${currentPersona} a question...`;
         }
     } catch (error) {
         console.error('Failed to select persona:', error);
+        alert('Failed to select persona. Please try again.');
+        personaSelect.value = previous;
+    }
+}
+
+async function triggerPersonaGeneration(name) {
+    try {
+        const resp = await fetch(`${API_BASE}/api/personas/${encodeURIComponent(name)}/generate`, { method: 'POST' });
+        if (!resp.ok) {
+            const detail = await resp.json().catch(() => ({}));
+            throw new Error(detail?.detail || `HTTP ${resp.status}`);
+        }
+        if (generationPollTimer) clearTimeout(generationPollTimer);
+        updateGenerationStatus(`Starting generation for ${name}…`, 0.05, true);
+        pollGenerationStatus();
+    } catch (err) {
+        console.error('Generate persona failed:', err);
+        alert('Failed to generate persona.');
     }
 }
 
@@ -197,26 +448,45 @@ async function loadModels() {
     try {
         const response = await fetch(`${API_BASE}/api/models`);
         const data = await response.json();
+        availableModels = data.models || [];
 
-        modelSelect.innerHTML = '<option value="">Select a model...</option>';
+        const recommendedGlyph = (name) => {
+            if (!name) return '';
+            const lower = name.toLowerCase();
+            if (lower === 'cogito:8b') return '🪄 ';
+            if (lower === 'qwen3:8b') return '🧠 ';
+            return '';
+        };
 
-        if (data.models && data.models.length > 0) {
-            data.models.forEach(model => {
+        const buildModelOptions = (selectEl, selectedValue) => {
+            if (!selectEl) return;
+            selectEl.innerHTML = '<option value="">Select a model...</option>';
+            if (availableModels.length === 0) {
+                selectEl.innerHTML = '<option value="">No models found</option>';
+                return;
+            }
+            availableModels.forEach(model => {
                 const option = document.createElement('option');
                 option.value = model;
-                option.textContent = model;
-                if (model === data.current) {
-                    option.selected = true;
-                    currentModel = model;
-                }
-                modelSelect.appendChild(option);
+                option.textContent = `${recommendedGlyph(model)}${model}`;
+                if (model === selectedValue) option.selected = true;
+                selectEl.appendChild(option);
             });
-        } else {
-            modelSelect.innerHTML = '<option value="">No models found</option>';
+        };
+
+        buildModelOptions(modelSelect, data.current || currentModel);
+        buildModelOptions(configChatModel, configState.chat_model || data.current);
+        buildModelOptions(configSymposiumModel, configState.symposium_model || data.current);
+        buildModelOptions(configPersonaModel, configState.persona_model || 'cogito:8b');
+        buildModelOptions(configCuratorModel, configState.curator_model || 'qwen3:8b');
+        buildModelOptions(symposiumModelSelect, configState.symposium_model || data.current);
+
+        if (data.current) {
+            currentModel = data.current;
         }
     } catch (error) {
         console.error('Failed to load models:', error);
-        modelSelect.innerHTML = '<option value="">Failed to load</option>';
+        if (modelSelect) modelSelect.innerHTML = '<option value="">Failed to load</option>';
     }
 }
 
@@ -504,6 +774,10 @@ function setupEventListeners() {
         selectPersona(e.target.value);
     });
 
+    if (personaReloadBtn) {
+        personaReloadBtn.addEventListener('click', reloadPersonas);
+    }
+
     // Settings toggles
     deepModeToggle.addEventListener('change', (e) => {
         toggleDeepMode(e.target.checked);
@@ -584,6 +858,18 @@ function setupEventListeners() {
         });
     }
 
+    if (autogenToggle) {
+        autogenToggle.addEventListener('change', async (e) => {
+            try {
+                await fetch(`${API_BASE}/api/settings/autogen-personas`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled: e.target.checked })
+                });
+            } catch (error) { console.error('Failed to toggle auto-generate personas:', error); }
+        });
+    }
+
     clarityModeToggle.addEventListener('change', (e) => {
         toggleClarityMode(e.target.checked);
     });
@@ -592,6 +878,12 @@ function setupEventListeners() {
     modelSelect.addEventListener('change', (e) => {
         selectModel(e.target.value);
     });
+
+    if (symposiumModelSelect) {
+        symposiumModelSelect.addEventListener('change', (e) => {
+            selectModel(e.target.value);
+        });
+    }
 
     // Chat form submission
     chatForm.addEventListener('submit', (e) => {
@@ -609,6 +901,14 @@ function setupEventListeners() {
             sendMessage(chatInput.value);
         }
     });
+
+    // Config Manager save
+    if (configSaveBtn) {
+        configSaveBtn.addEventListener('click', (e) => {
+            e.preventDefault();
+            saveConfig();
+        });
+    }
 }
 
 // =============================================
@@ -672,10 +972,40 @@ function populateSymposiumPersonas() {
 
     options.forEach(opt => {
         if (opt.value) {
-            symposiumPersonaA.innerHTML += `<option value="${opt.value}">${opt.textContent}</option>`;
-            symposiumPersonaB.innerHTML += `<option value="${opt.value}">${opt.textContent}</option>`;
+            const disabledAttr = opt.dataset.pending === 'true' ? 'disabled' : '';
+            symposiumPersonaA.innerHTML += `<option value="${opt.value}" ${disabledAttr}>${opt.textContent}</option>`;
+            symposiumPersonaB.innerHTML += `<option value="${opt.value}" ${disabledAttr}>${opt.textContent}</option>`;
         }
     });
+}
+
+function populateConfigPersonas() {
+    if (!configDefaultPersonaChat || !configDefaultPersonaSymposium) return;
+    const options = personaSelect.querySelectorAll('option');
+    const buildOptions = (selectEl) => {
+        selectEl.innerHTML = '<option value="">(None)</option>';
+        options.forEach(opt => {
+            if (opt.value && opt.dataset.pending !== 'true') {
+                const option = document.createElement('option');
+                option.value = opt.value;
+                option.textContent = opt.textContent;
+                selectEl.appendChild(option);
+            }
+        });
+    };
+    buildOptions(configDefaultPersonaChat);
+    buildOptions(configDefaultPersonaSymposium);
+    if (configDefaultPersonaSymposiumB) buildOptions(configDefaultPersonaSymposiumB);
+
+    if (configState.default_persona_chat) {
+        configDefaultPersonaChat.value = configState.default_persona_chat;
+    }
+    if (configState.default_persona_symposium) {
+        configDefaultPersonaSymposium.value = configState.default_persona_symposium;
+    }
+    if (configState.default_persona_symposium_b && configDefaultPersonaSymposiumB) {
+        configDefaultPersonaSymposiumB.value = configState.default_persona_symposium_b;
+    }
 }
 
 const symposiumForm = document.getElementById('symposium-form');
@@ -949,12 +1279,16 @@ function populatePersonaGrid() {
         if (opt.value) {
             const card = document.createElement('div');
             card.className = 'persona-card';
+            const isPending = opt.dataset.pending === 'true';
             card.innerHTML = `
-                <h3>${opt.textContent}</h3>
-                <p>Click to select or configure this persona.</p>
+                <div class="persona-card-header">
+                    <h3>${opt.textContent}</h3>
+                    ${isPending ? '<span class="badge pending">Pending</span>' : ''}
+                </div>
+                <p>${isPending ? 'Generation required before use.' : 'Click to select or configure this persona.'}</p>
                 <div class="persona-card-actions">
-                    <button class="select-btn" data-persona="${opt.value}">Select</button>
-                    <button class="config-btn" data-persona="${opt.value}">⚙️ Configure</button>
+                    <button class="select-btn" data-persona="${opt.value}" ${isPending ? 'disabled' : ''}>Select</button>
+                    ${isPending ? `<button class="generate-btn" data-persona="${opt.value}">⚒️ Generate</button>` : `<button class="config-btn" data-persona="${opt.value}">⚙️ Configure</button>`}
                 </div>
             `;
             personaGrid.appendChild(card);
@@ -975,6 +1309,13 @@ function populatePersonaGrid() {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             openPersonaModal(btn.dataset.persona);
+        });
+    });
+
+    personaGrid.querySelectorAll('.generate-btn').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+            e.stopPropagation();
+            await triggerPersonaGeneration(btn.dataset.persona);
         });
     });
 }

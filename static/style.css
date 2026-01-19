@@ -133,6 +133,10 @@ body {
     background-position: right 12px center;
 }
 
+.sidebar .persona-dropdown {
+    width: 100%;
+}
+
 .persona-dropdown:hover {
     border-color: var(--border-accent);
 }
@@ -899,12 +903,116 @@ body {
 
 .persona-card {
     background: var(--bg-secondary);
+
+.persona-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+}
+
+.badge.pending {
+    background: #f97316;
+    color: white;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+.persona-card .generate-btn {
+    background: var(--accent-primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 8px 10px;
+    cursor: pointer;
+}
+
+.persona-card .generate-btn:hover {
+    background: var(--accent-secondary);
+}
+
+.status-banner {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border: 1px solid var(--border-accent);
+    border-radius: 10px;
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.status-progress {
+    width: 100%;
+    height: 8px;
+    background: var(--bg-elevated);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.status-progress-bar {
+    height: 100%;
+    width: 0%;
+    background: var(--accent-primary);
+    transition: width 0.3s ease;
+}
     border: 1px solid var(--border-subtle);
     border-radius: 12px;
     padding: 20px;
     cursor: pointer;
     transition: all var(--transition-fast);
 }
+
+    /* Config Manager */
+    .config-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+        gap: 16px;
+        margin-top: 12px;
+    }
+
+    .config-card {
+        background: #11141a;
+        border: 1px solid #1f2430;
+        border-radius: 12px;
+        padding: 14px 16px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+    }
+
+    .config-card h3 {
+        margin: 0 0 8px 0;
+        font-size: 15px;
+    }
+
+    .config-card .form-group.inline {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-bottom: 10px;
+    }
+
+    .config-card select.persona-dropdown,
+    .config-card input.topic-input {
+        width: 100%;
+        background: #0d1117;
+        border: 1px solid #1f2430;
+        color: var(--text-primary);
+    }
+
+    .config-actions {
+        margin-top: 16px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .save-status {
+        font-size: 13px;
+        color: #9ca3af;
+    }
 
 .persona-card:hover {
     border-color: var(--accent-primary);

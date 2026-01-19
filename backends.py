@@ -40,7 +40,12 @@ class LLMBackend(abc.ABC):
 class OllamaBackend(LLMBackend):
     """Ollama API backend using OpenAI-compatible interface."""
     
-    def __init__(self, model: str, base_url: str = "http://localhost:11434/v1"):
+    def __init__(self, model: str, base_url: Optional[str] = None):
+        if base_url is None:
+            host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
+            if not host.startswith("http://") and not host.startswith("https://"):
+                host = f"http://{host}"
+            base_url = f"{host}/v1"
         self.model = model
         self.base_url = base_url
         self._client = None
@@ -117,7 +122,7 @@ class OllamaBackend(LLMBackend):
     def is_available(self) -> bool:
         import socket
         try:
-            host = self.base_url.replace("http://", "").replace("/v1", "")
+            host = self.base_url.replace("http://", "").replace("https://", "").replace("/v1", "")
             if ":" in host:
                 host, port = host.split(":")
                 port = int(port)

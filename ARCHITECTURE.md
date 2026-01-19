@@ -135,3 +135,5 @@ None of these need The Whetstone's philosophy logic, but they all benefit from c
 - Implement export that checks for existing CODEX
 - Add `--regenerate` flag to force recreation
 - Define clean API between Whetstone and codepax
+- **See [CODEX_LIFECYCLE.md](CODEX_LIFECYCLE.md) for detailed import/export workflows and curator logic.**
+

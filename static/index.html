@@ -31,6 +31,7 @@
                             <button class="menu-item" data-view="personas">📚 Persona Manager</button>
                             <button class="menu-item" data-view="privacy">🛡️ Privacy Manager</button>
                             <button class="menu-item" data-view="scheduler">⏰ Scheduler</button>
+                            <button class="menu-item" data-view="config">⚙️ Config Manager</button>
                         </div>
                     </div>
                     <h1 class="logo">⚔️ The Whetstone</h1>
@@ -75,6 +76,13 @@
                     <h3 class="section-title">Philosopher B</h3>
                     <select id="symposium-persona-b" class="persona-dropdown">
                         <option value="">Select...</option>
+                    </select>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="section-title">Symposium Model</h3>
+                    <select id="symposium-model-select" class="persona-dropdown">
+                        <option value="">Loading models...</option>
                     </select>
                 </div>
 
@@ -222,7 +230,20 @@
                             </select>
                         </label>
                         <button id="scan-personas-btn" class="toolbar-btn">🔄 Scan for Personas</button>
+                        <button id="persona-reload-btn" class="toolbar-btn" title="Reload personas from disk (apply new CODEX)">♻️ Reload Personas</button>
                         <button id="export-all-btn" class="toolbar-btn">📦 Export All as CODEX</button>
+                        <label class="scan-mode-toggle" style="margin-left: auto;">
+                            <span>Auto-generate pending on chat</span>
+                            <input type="checkbox" id="autogen-toggle" class="toggle-input">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="generation-status" class="status-banner" style="display: none;">
+                    <div class="status-banner-text" id="generation-status-text">Preparing generation…</div>
+                    <div class="status-progress">
+                        <div class="status-progress-bar" id="generation-progress-bar" style="width: 0%;"></div>
                     </div>
                 </div>
 
@@ -325,6 +346,94 @@
                         </div>
                         <button id="add-task-btn" class="toolbar-btn">Add Task</button>
                     </div>
+                </div>
+            </div>
+
+            <!-- Config Manager View -->
+            <div id="view-config" class="view-container">
+                <div class="view-header">
+                    <h2>⚙️ Configuration Manager</h2>
+                    <p>Tune defaults for startup, models, and experimental features.</p>
+                </div>
+
+                <div class="config-grid">
+                    <div class="config-card">
+                        <h3>Startup</h3>
+                        <label class="form-group inline">
+                            <span>Default View</span>
+                            <select id="config-startup-view" class="persona-dropdown">
+                                <option value="chat">Chat</option>
+                                <option value="symposium">Symposium</option>
+                                <option value="personas">Persona Manager</option>
+                                <option value="privacy">Privacy Manager</option>
+                                <option value="scheduler">Scheduler</option>
+                            </select>
+                        </label>
+                        <label class="form-group inline">
+                            <span>Default Persona (Chat)</span>
+                            <select id="config-default-persona-chat" class="persona-dropdown"></select>
+                        </label>
+                        <label class="form-group inline">
+                            <span>Default Persona (Symposium)</span>
+                            <select id="config-default-persona-symposium" class="persona-dropdown"></select>
+                        </label>
+                        <label class="form-group inline">
+                            <span>Default Persona (Symposium B)</span>
+                            <select id="config-default-persona-symposium-b" class="persona-dropdown"></select>
+                        </label>
+                    </div>
+
+                    <div class="config-card">
+                        <h3>Models</h3>
+                        <label class="form-group inline">
+                            <span>Chat Model</span>
+                            <select id="config-chat-model" class="persona-dropdown"></select>
+                        </label>
+                        <label class="form-group inline">
+                            <span>Symposium Model</span>
+                            <select id="config-symposium-model" class="persona-dropdown"></select>
+                        </label>
+                        <label class="form-group inline">
+                            <span>Persona Generator</span>
+                            <select id="config-persona-model" class="persona-dropdown"></select>
+                        </label>
+                        <label class="form-group inline">
+                            <span>Curator Model</span>
+                            <select id="config-curator-model" class="persona-dropdown"></select>
+                        </label>
+                    </div>
+
+                    <div class="config-card">
+                        <h3>Connectivity</h3>
+                        <label class="form-group inline">
+                            <span>SSL Certificate</span>
+                            <input id="config-ssl-cert" type="text" class="topic-input" placeholder="/path/to/cert.crt">
+                        </label>
+                        <label class="form-group inline">
+                            <span>SSL Key</span>
+                            <input id="config-ssl-key" type="text" class="topic-input" placeholder="/path/to/key.key">
+                        </label>
+                    </div>
+
+                    <div class="config-card">
+                        <h3>Experimental & Fun</h3>
+                        <label class="toggle-row large">
+                            <span>Enable Vulkan (experimental)</span>
+                            <input type="checkbox" id="config-vulkan-toggle" class="toggle-input">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <label class="toggle-row large">
+                            <span>Enable Chorus Hive Mind</span>
+                            <input type="checkbox" id="config-chorus-toggle" class="toggle-input">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <p class="form-hint">Chorus is a hive-mind philosopher persona that can draw from the entire library.</p>
+                    </div>
+                </div>
+
+                <div class="config-actions">
+                    <button id="config-save-btn" class="toolbar-btn primary">Save Configuration</button>
+                    <span id="config-save-status" class="save-status"></span>
                 </div>
             </div>
 

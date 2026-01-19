@@ -67,3 +67,11 @@ philosophy_library/.metadata*/
 
 # Test files
 *.codex
+.metadata_v3/A Treatise on Good Works by Martin Luther.metadata.json
+.metadata_v3/Bushido, the Soul of Japan by Inazo Nitobe.metadata.json
+.metadata_v3/Seneca's Morals of a Happy Life, Benefits, Anger and Clemency by Lucius Annaeus Seneca.metadata.json
+.metadata_v3/Soeur Thérèse de l'Enfant-Jésus et de la Sainte Face by Saint de Lisieux Thérèse.metadata.json
+curated/A Treatise on Good Works by Martin Luther.txt
+curated/Bushido, the Soul of Japan by Inazo Nitobe.txt
+curated/Seneca's Morals of a Happy Life, Benefits, Anger and Clemency by Lucius Annaeus Seneca.txt
+curated/Soeur Thérèse de l'Enfant-Jésus et de la Sainte Face by Saint de Lisieux Thérèse.txt

@@ -9,8 +9,11 @@ Run with: python web_api.py
 import os
 import asyncio
 import logging
+import tempfile
+import shutil
 from typing import Optional
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
@@ -20,12 +23,17 @@ from sse_starlette.sse import EventSourceResponse
 from pydantic import BaseModel
 
 from core import PhilosopherCore
+import zipfile
+import json
 from scheduler_service import SocraticScheduler
 from symposium import Symposium
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
+# Optional admin shutdown guard (disabled unless token set)
+SHUTDOWN_TOKEN = os.getenv("WHETSTONE_SHUTDOWN_TOKEN")
 
 # --- Shared State ---
 core: Optional[PhilosopherCore] = None
@@ -46,6 +54,61 @@ class ScanStatus:
         self.lock = asyncio.Lock()
 
 scan_state = ScanStatus()
+
+
+class GenerationStatus:
+    def __init__(self):
+        self.is_running = False
+        self.persona_name: Optional[str] = None
+        self.progress = 0.0
+        self.error = None
+        self.success = False
+        self.output = ""
+        self.lock = asyncio.Lock()
+
+generation_state = GenerationStatus()
+
+# --- Configuration Helpers ---
+
+def get_config():
+    if not core:
+        return DEFAULT_CONFIG.copy()
+    saved = core.db.get_setting("config_manager", {}) or {}
+    merged = DEFAULT_CONFIG.copy()
+    merged.update(saved)
+    return merged
+
+
+def set_config(payload: dict):
+    if not core:
+        return
+    config = get_config()
+    config.update(payload or {})
+    core.db.set_setting("config_manager", config)
+
+    # Apply chat model immediately if changed
+    new_chat_model = config.get("chat_model")
+    if new_chat_model and new_chat_model != getattr(core, "default_chat_model", None):
+        core.set_chat_model(new_chat_model)
+
+    return config
+
+# Persona generator model (distinct from curator model)
+PERSONA_MODEL = os.getenv("WHETSTONE_PERSONA_MODEL", "cogito:8b")
+DEFAULT_CONFIG = {
+    "startup_view": "chat",
+    "chat_model": os.getenv("WHETSTONE_MODEL", "cogito:8b"),
+    "symposium_model": os.getenv("WHETSTONE_MODEL", "cogito:8b"),
+    "persona_model": os.getenv("WHETSTONE_PERSONA_MODEL", PERSONA_MODEL),
+    "curator_model": os.getenv("WHETSTONE_CURATOR_MODEL", "qwen3:8b"),
+    "default_persona_chat": None,
+    "default_persona_symposium": None,
+    "default_persona_symposium_b": None,
+    "ssl_cert": None,
+    "ssl_key": None,
+    "vulkan_enabled": False,
+    "chorus_enabled": False,
+}
 
 
 @asynccontextmanager
@@ -125,6 +188,25 @@ class SymposiumStartRequest(BaseModel):
     topic: str
 
 
+class ShutdownRequest(BaseModel):
+    token: Optional[str] = None
+
+
+class ConfigRequest(BaseModel):
+    startup_view: Optional[str] = None
+    chat_model: Optional[str] = None
+    symposium_model: Optional[str] = None
+    persona_model: Optional[str] = None
+    curator_model: Optional[str] = None
+    default_persona_chat: Optional[str] = None
+    default_persona_symposium: Optional[str] = None
+    default_persona_symposium_b: Optional[str] = None
+    ssl_cert: Optional[str] = None
+    ssl_key: Optional[str] = None
+    vulkan_enabled: Optional[bool] = None
+    chorus_enabled: Optional[bool] = None
+
+
 # --- Routes ---
 
 @app.get("/")
@@ -139,6 +221,7 @@ async def serve_index():
 @app.get("/api/status")
 async def get_status():
     """System health and info."""
+    config = get_config()
     return {
         "status": "ok",
         "backend": core.backend.name if core and core.backend else "not initialized",
@@ -147,9 +230,37 @@ async def get_status():
         "deep_mode": core.deep_mode if core else False,
         "clarity_mode": core.clarity_mode if core else False,
         "logging_enabled": core.db.logging_enabled if core else False,
+        "autogen_personas": core.autogen_personas if core else True,
         "scheduler_running": scheduler.running if scheduler else False,
-        "scheduled_tasks": len(scheduler.tasks) if scheduler else 0
+        "scheduled_tasks": len(scheduler.tasks) if scheduler else 0,
+        "config": {
+            "startup_view": config.get("startup_view"),
+            "chat_model": config.get("chat_model"),
+            "symposium_model": config.get("symposium_model"),
+            "persona_model": config.get("persona_model"),
+            "curator_model": config.get("curator_model"),
+            "default_persona_chat": config.get("default_persona_chat"),
+            "default_persona_symposium": config.get("default_persona_symposium"),
+            "default_persona_symposium_b": config.get("default_persona_symposium_b"),
+            "vulkan_enabled": config.get("vulkan_enabled"),
+            "chorus_enabled": config.get("chorus_enabled"),
+        }
     }
+
+
+@app.get("/api/config")
+async def get_config_api():
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    return {"config": get_config()}
+
+
+@app.post("/api/config")
+async def update_config(request: ConfigRequest):
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    config = set_config(request.model_dump(exclude_none=True))
+    return {"success": True, "config": config}
 
 
 @app.get("/api/personas")
@@ -158,17 +269,43 @@ async def list_personas():
     if not core:
         raise HTTPException(status_code=503, detail="Core not initialized")
     
+    # Ensure we have a selected persona so chat works out-of-the-box
+    if not core.current_persona:
+        core._ensure_default_persona()
+
     personas = core.get_valid_personas()
     return {
         "personas": [
             {
                 "name": p.get("name", "Unknown"),
                 "description": p.get("description", ""),
-                "library_filter": p.get("library_filter", [])
+                "library_filter": p.get("library_filter", []),
+                "category": p.get("category", "uncategorized"),
+                "source_codex": p.get("source_codex"),
+                "pending": p.get("pending", False),
             }
             for p in personas
         ],
         "current": core.current_persona.get("name") if core.current_persona else None
+    }
+
+
+@app.post("/api/personas/reload")
+async def reload_personas():
+    """Refresh personas from disk and return updated selection state."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+
+    # Re-run organization pass in case new CODEX files were added or moved
+    core._organize_codex_library()
+    core.refresh_data()
+    core._ensure_default_persona()
+
+    personas = core.get_valid_personas()
+    return {
+        "success": True,
+        "persona_count": len(personas),
+        "current": core.current_persona.get("name") if core.current_persona else None,
     }
 
 
@@ -185,6 +322,7 @@ async def select_persona(request: PersonaSelectRequest):
         raise HTTPException(status_code=404, detail=f"Persona '{request.persona_name}' not found")
     
     core.set_persona(persona)
+    logger.info(f"[API] Persona selected: {persona.get('name')}")
     return {"success": True, "persona": persona.get("name")}
 
 
@@ -242,6 +380,205 @@ async def update_persona_config(persona_name: str, request: PersonaConfigRequest
     # Save to DB using the formal name as the key for better consistency
     core.db.set_setting(f"persona_preamble_{persona.get('name')}", request.preamble)
     return {"success": True, "persona": persona.get("name")}
+
+
+@app.post("/api/personas/{persona_name}/generate")
+async def generate_persona(persona_name: str):
+    """Generate (or finalize) a pending persona (async)."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+
+    if generation_state.is_running:
+        raise HTTPException(status_code=409, detail="Generation already in progress")
+
+    persona, _ = find_persona(persona_name)
+    if not persona:
+        raise HTTPException(status_code=404, detail=f"Persona '{persona_name}' not found")
+
+    async with generation_state.lock:
+        if generation_state.is_running:
+            raise HTTPException(status_code=409, detail="Generation already in progress")
+        generation_state.is_running = True
+        generation_state.persona_name = persona.get("name")
+        generation_state.progress = 0.05
+        generation_state.error = None
+        generation_state.success = False
+
+    asyncio.create_task(run_generation_task(persona.get("name")))
+    return {"success": True, "persona": persona.get("name"), "status": "started"}
+
+
+async def run_generation_task(persona_name: str):
+    """Background generation task. Hook curator here."""
+    try:
+        if not core:
+            raise RuntimeError("Core not initialized")
+
+        config = get_config()
+        persona_model = config.get("persona_model") or PERSONA_MODEL
+
+        persona, _ = find_persona(persona_name)
+        if not persona:
+            raise RuntimeError(f"Persona {persona_name} not found")
+
+        source_path = persona.get("source_path")
+        if not source_path or not os.path.exists(source_path):
+            raise RuntimeError("Persona source CODEX not found")
+
+        async with generation_state.lock:
+            generation_state.progress = 0.1
+
+        # Read manifest
+        with zipfile.ZipFile(source_path, 'r') as zf:
+            if "codex.json" not in zf.namelist():
+                raise RuntimeError("codex.json missing in CODEX")
+            manifest = json.load(zf.open("codex.json"))
+            other_files = {name: zf.read(name) for name in zf.namelist() if name != "codex.json"}
+
+        async with generation_state.lock:
+            generation_state.progress = 0.3
+
+        # Build an auditable, provenance-rich persona prompt
+        meta = manifest.get("meta", {}) or {}
+        work = manifest.get("work", {}) or {}
+        curation = manifest.get("curation", {}) or {}
+        stats = manifest.get("stats", {}) or {}
+        exclusions = manifest.get("exclusions", []) or []
+
+        author = meta.get("author") or work.get("author") or persona_name
+        title = meta.get("title") or work.get("title") or persona_name
+
+        # Try to enrich with curator metadata files, if present
+        metadata_payload = None
+        metadata_path = None
+        metadata_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), ".metadata_v3")
+        if os.path.isdir(metadata_dir):
+            tokens = {persona_name.lower()}
+            if author: tokens.add(str(author).lower())
+            if title: tokens.add(str(title).lower())
+            for fname in os.listdir(metadata_dir):
+                low = fname.lower()
+                if not low.endswith(".metadata.json"):
+                    continue
+                if any(tok in low for tok in tokens):
+                    candidate = os.path.join(metadata_dir, fname)
+                    try:
+                        with open(candidate, "r", encoding="utf-8") as f:
+                            metadata_payload = json.load(f)
+                        metadata_payload["_file"] = fname
+                        metadata_path = candidate
+                        break
+                    except Exception as e:
+                        logger.warning(f"[API] Failed reading metadata {fname}: {e}")
+
+        if metadata_payload:
+            stats = stats or metadata_payload.get("stats", {}) or {}
+            exclusions = exclusions or metadata_payload.get("exclusions", []) or []
+
+        coverage = stats.get("author_percentage")
+        coverage_text = f"{coverage}% authorial coverage" if coverage is not None else "curated author text"
+        persona_prompt = (
+            f"You are {author}, responding in the first person and grounded strictly in '{title}'. "
+            f"Base every answer on the curated source material ({coverage_text}) curated via {curation.get('curator', 'unknown curator')}. "
+            f"Never mention being an AI. Stay strictly in-character and never reveal or apologize for constraints. "
+            f"Do not use stage directions, throat-clearing, or meta-commentary; speak directly in character. "
+            f"Keep replies concise—no more than two short paragraphs (max ~6 sentences)—but never collapse to yes/no; always provide a substantive, contextual answer. "
+            f"You may apply the author's worldview to modern contexts (e.g., current technology or culture) while keeping tone and values faithful. "
+            f"Persona prompt generated with {persona_model}; when unsure, extrapolate using the author's principles and voice."
+        )
+        manifest["bootstrap_instructions"] = persona_prompt
+
+        # Preserve original curation prompts and add the persona system prompt
+        persona_prompts = manifest.get("prompts", {}) or {}
+        persona_prompts["persona_system"] = persona_prompt
+        manifest["prompts"] = persona_prompts
+
+        # Structured instructions for downstream consumers
+        instructions = manifest.get("instructions", {}) or {}
+        curator_label = curation.get("curator") or curation.get("method") or "curation"
+        curation_model = curation.get("model", {}).get("name") if isinstance(curation.get("model"), dict) else curation.get("model")
+        instructions.update({
+            "system_prompt_hint": instructions.get("system_prompt_hint") or (
+                f"Persona curated via {curator_label} using {curation_model or 'unknown model'} on {curation.get('curated_date', 'unknown date')}; persona prompt generated with {persona_model}."
+            ),
+            "usage": instructions.get("usage") or (
+                "Stay in-character; ground answers in the curated text; avoid external speculation; "
+                "respond with up to two short paragraphs (never just yes/no); no stage directions or meta-commentary; do not mention system or constraints; "
+                "you may apply the author's worldview to new contexts while preserving their tone and principles."
+            ),
+            "filters": {
+                "method": curation.get("method"),
+                "exclusion_count": len(exclusions),
+                "stats": stats,
+                "metadata_file": metadata_payload.get("_file") if metadata_payload else None,
+                "persona_model": persona_model,
+                "curation_model": curation_model,
+            },
+        })
+        manifest["instructions"] = instructions
+
+        # Record audit/provenance for reproducibility
+        manifest["provenance"] = {
+            "generated_by": "whetstone persona generator",
+            "generated_at": datetime.utcnow().isoformat() + "Z",
+            "source_codex": os.path.basename(source_path),
+            "curation": curation,
+            "stats": stats,
+            "metadata_file": os.path.basename(metadata_path) if metadata_path else None,
+            "persona_model": persona_model,
+        }
+        manifest["audit_trail"] = {
+            "exclusions": exclusions,
+            "metadata": metadata_payload,
+            "notes": "Exclusions and stats captured for auditability.",
+            "persona_model": persona_model,
+            "curation_model": curation_model,
+        }
+
+        async with generation_state.lock:
+            generation_state.progress = 0.6
+
+        # Rewrite CODEX
+        tmp_fd, tmp_path = tempfile.mkstemp(suffix=".codex")
+        os.close(tmp_fd)
+        try:
+            with zipfile.ZipFile(tmp_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                zf.writestr("codex.json", json.dumps(manifest, ensure_ascii=False, indent=2))
+                for name, data in other_files.items():
+                    zf.writestr(name, data)
+            shutil.move(tmp_path, source_path)
+        finally:
+            if os.path.exists(tmp_path):
+                try: os.remove(tmp_path)
+                except Exception: pass
+
+        # Refresh core to pick up new prompt and clear pending
+        core.refresh_data()
+        core.mark_persona_ready(persona_name)
+
+        async with generation_state.lock:
+            generation_state.progress = 1.0
+            generation_state.success = True
+            generation_state.is_running = False
+            generation_state.output = "Persona prompt generated with audit trail"
+    except Exception as e:
+        logger.error(f"[API] Generation failed for {persona_name}: {e}")
+        async with generation_state.lock:
+            generation_state.error = str(e)
+            generation_state.is_running = False
+            generation_state.success = False
+
+
+@app.get("/api/personas/generation/status")
+async def generation_status():
+    return {
+        "is_running": generation_state.is_running,
+        "persona_name": generation_state.persona_name,
+        "progress": generation_state.progress,
+        "success": generation_state.success,
+        "error": generation_state.error,
+        "output": generation_state.output,
+    }
 
 
 @app.get("/api/personas/{persona_name}/export")
@@ -401,6 +738,7 @@ async def run_scan_task(deep: bool):
         cmd.append("--deep")
         
     try:
+        pre_existing = set(core.personas.keys()) if core else set()
         # Run subprocess in a thread to not block the event loop
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
@@ -410,13 +748,19 @@ async def run_scan_task(deep: bool):
                 cwd=os.path.dirname(script_path),
                 capture_output=True,
                 text=True,
-                timeout=300 # 5 minute timeout for background task
+                timeout=1800 # 30-minute timeout for background task
             )
         )
         
         # Refresh personas in core
         if core:
             core.refresh_data()
+            post_keys = set(core.personas.keys())
+            new_keys = post_keys - pre_existing
+            for k in new_keys:
+                p = core.personas.get(k)
+                if p:
+                    core.mark_persona_pending(p.get("name", k))
             
         async with scan_state.lock:
             scan_state.is_running = False
@@ -458,7 +802,16 @@ async def chat(request: ChatRequest):
         raise HTTPException(status_code=503, detail="Core not initialized")
     
     if not core.current_persona:
-        raise HTTPException(status_code=400, detail="No persona selected. Call /api/personas/select first.")
+        core._ensure_default_persona()
+        if not core.current_persona:
+            raise HTTPException(status_code=400, detail="No persona available. Load personas first.")
+
+    # Auto-generate pending personas if allowed
+    if core.is_persona_pending(core.current_persona.get("name")):
+        if core.autogen_personas:
+            core.generate_persona(core.current_persona.get("name"))
+        else:
+            raise HTTPException(status_code=409, detail="Persona is pending generation. Generate it first or enable auto-generate.")
     
     async def generate():
         try:
@@ -526,6 +879,17 @@ async def toggle_clarity_mode(request: SettingsRequest):
     return {"clarity_mode": core.clarity_mode}
 
 
+@app.post("/api/settings/autogen-personas")
+async def toggle_autogen_personas(request: SettingsRequest):
+    """Toggle automatic generation of pending personas on first chat."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+
+    core.autogen_personas = request.enabled
+    core.db.set_setting("autogen_personas", request.enabled)
+    return {"autogen_personas": core.autogen_personas}
+
+
 @app.post("/api/settings/ultra-privacy")
 async def toggle_ultra_privacy(request: SettingsRequest):
     """Toggle Ultra-Privacy Mode (disables all logging and restoration)."""
@@ -560,6 +924,21 @@ async def set_default_model(request: ModelSelectRequest):
     return {"success": True, "default_model": request.model_name}
 
 
+@app.post("/api/models/select")
+async def select_model(request: ModelSelectRequest):
+    """Switch active chat/symposium model."""
+    if not core:
+        raise HTTPException(status_code=503, detail="Core not initialized")
+    try:
+        core.set_chat_model(request.model_name)
+        # Persist to config manager for consistency
+        set_config({"chat_model": request.model_name})
+        return {"success": True, "model": request.model_name}
+    except Exception as e:
+        logger.error(f"[API] Failed to switch model: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.post("/api/memory/summarize")
 async def trigger_summarization():
     """Manually trigger session summarization (e.g., on exit)."""
@@ -572,12 +951,18 @@ async def trigger_summarization():
 
 @app.get("/api/models")
 async def list_models():
-    """List available Ollama models."""
-    import requests
+    """List available Ollama models, honoring OLLAMA_HOST if set."""
+    import httpx
+
+    host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
+    if not host.startswith("http://") and not host.startswith("https://"):
+        host = f"http://{host}"
+    tags_url = f"{host}/api/tags"
+
     try:
-        # Query Ollama for available models
-        response = requests.get("http://localhost:11434/api/tags", timeout=5)
-        if response.status_code == 200:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            response = await client.get(tags_url)
+            response.raise_for_status()
             data = response.json()
             models = [m.get("name", "") for m in data.get("models", [])]
             current_model = None
@@ -585,13 +970,15 @@ async def list_models():
                 current_model = getattr(core.backend, 'model', None)
             return {
                 "models": models,
-                "current": current_model
+                "current": current_model,
+                "endpoint": host
             }
-        else:
-            return {"models": [], "current": None, "error": "Could not fetch models"}
+    except httpx.HTTPStatusError as e:
+        logger.error(f"Failed to list models from {tags_url}: HTTP {e.response.status_code}")
+        return {"models": [], "current": None, "error": f"HTTP {e.response.status_code}", "endpoint": host}
     except Exception as e:
-        logger.error(f"Failed to list models: {e}")
-        return {"models": [], "current": None, "error": str(e)}
+        logger.error(f"Failed to list models from {tags_url}: {e}")
+        return {"models": [], "current": None, "error": str(e), "endpoint": host}
 
 
 @app.post("/api/models/select")
@@ -601,15 +988,54 @@ async def select_model(request: ModelSelectRequest):
         raise HTTPException(status_code=503, detail="Core not initialized")
     
     try:
+        import httpx
         from backends import OllamaBackend
+        host = os.getenv("OLLAMA_HOST", "http://127.0.0.1:11434").rstrip("/")
+        if not host.startswith("http://") and not host.startswith("https://"):
+            host = f"http://{host}"
+        base_url = f"{host}/v1"
+
+        stop_url = f"{host}/api/stop"
+        ps_url = f"{host}/api/ps"
+
+        # Best-effort unload of any loaded models except the target
+        try:
+            with httpx.Client(timeout=5.0) as client:
+                names_to_stop = set()
+
+                # Discover currently loaded models
+                try:
+                    ps_resp = client.get(ps_url)
+                    ps_resp.raise_for_status()
+                    ps_data = ps_resp.json()
+                    for m in ps_data.get("models", []):
+                        name = m.get("name")
+                        if name and name != request.model_name:
+                            names_to_stop.add(name)
+                except Exception as ps_err:
+                    # Fallback to just the currently tracked backend model
+                    current_model = getattr(core.backend, "model", None) if core and core.backend else None
+                    if current_model and current_model != request.model_name:
+                        names_to_stop.add(current_model)
+                    logger.warning(f"[API] ps failed, stopping known model(s): {ps_err}")
+
+                for name in names_to_stop:
+                    try:
+                        client.post(stop_url, json={"name": name})
+                        logger.info(f"[API] Stopped model: {name}")
+                    except Exception as stop_err:
+                        logger.warning(f"[API] Failed to stop model '{name}': {stop_err}")
+        except Exception as e_stop:
+            logger.warning(f"[API] Model stop pass failed: {e_stop}")
+
         # Create new backend with selected model
-        core.backend = OllamaBackend(model=request.model_name)
+        core.backend = OllamaBackend(model=request.model_name, base_url=base_url)
         
         # Verify it's available
         if not core.backend.is_available():
-            raise HTTPException(status_code=400, detail=f"Model '{request.model_name}' is not available")
+            raise HTTPException(status_code=400, detail=f"Model '{request.model_name}' is not available at {host}")
         
-        logger.info(f"[API] Switched to model: {request.model_name}")
+        logger.info(f"[API] Switched to model: {request.model_name} (base: {host})")
         return {"success": True, "model": request.model_name}
     except Exception as e:
         logger.error(f"Failed to switch model: {e}")
@@ -784,6 +1210,40 @@ async def symposium_interject(request: SymposiumInterjectRequest):
     turn = active_symposium.interject(request.message, target=request.target)
     
     return {"success": True, "turn": turn}
+
+
+# --- Admin (optional) ---
+
+@app.post("/api/admin/shutdown")
+async def shutdown_server(request: ShutdownRequest, http_request: Request):
+    """Gracefully stop uvicorn when launched via main.py web.
+
+    Disabled unless WHETSTONE_SHUTDOWN_TOKEN is set. Provide the token in the JSON body.
+    """
+    if not SHUTDOWN_TOKEN:
+        raise HTTPException(status_code=403, detail="Shutdown API is disabled")
+
+    if request.token != SHUTDOWN_TOKEN:
+        raise HTTPException(status_code=403, detail="Invalid shutdown token")
+
+    # Best-effort cleanup
+    try:
+        if scheduler:
+            scheduler.stop()
+        if core:
+            core.summarize_and_store_session()
+    except Exception as e:
+        logger.error(f"Error during shutdown cleanup: {e}")
+
+    # Schedule process exit after response flushes
+    async def _exit_later():
+        await asyncio.sleep(0.5)
+        os._exit(0)
+
+    asyncio.create_task(_exit_later())
+
+    logger.info("[API] Shutdown requested; exiting shortly.")
+    return {"success": True, "message": "Shutting down"}
 
 
 # --- Main Entry Point ---

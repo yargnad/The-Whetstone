@@ -718,6 +718,9 @@ def launch_ollama_server():
     print("[INFO] Ollama server not detected. Launching 'ollama serve' with 16k context window...")
     env = os.environ.copy()
     env["OLLAMA_CONTEXT_LENGTH"] = "16384"
+    # Prefer Vulkan backend and steer to Intel GPU when available
+    env.setdefault("OLLAMA_VULKAN", "1")
+    env.setdefault("OLLAMA_GPU", "intel")
     if sys.platform.startswith("win"):
         DETACHED_PROCESS = 0x00000008
         subprocess.Popen(["ollama", "serve"], creationflags=DETACHED_PROCESS, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, env=env)

@@ -11,8 +11,13 @@ import sys
 import os
 import argparse
 import subprocess
+import asyncio
 # import uvicorn (Moved to run_web)
 from utils import is_ollama_running, launch_ollama_server
+
+# Ensure Windows handles Ctrl+C reliably with uvicorn
+if os.name == "nt":
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
 
 # Import applications
 # We deliberately import inside functions if needed to avoid dependency overhead 
@@ -73,8 +78,32 @@ def run_web(host="0.0.0.0", port=8080, ssl_keyfile=None, ssl_certfile=None):
     if protocol == "https":
         print(f"  SSL Enabled: {os.path.basename(ssl_certfile)}")
     print("="*50 + "\n")
-    
-    uvicorn.run(app, host=host, port=port, log_level="info", ssl_keyfile=ssl_keyfile, ssl_certfile=ssl_certfile)
+
+    # Explicit config to improve shutdown behavior (short keep-alive + graceful timeout)
+    config = uvicorn.Config(
+        app,
+        host=host,
+        port=port,
+        log_level="info",
+        ssl_keyfile=ssl_keyfile,
+        ssl_certfile=ssl_certfile,
+        timeout_keep_alive=2,
+        timeout_graceful_shutdown=3,
+        loop="asyncio",
+    )
+    server = uvicorn.Server(config)
+
+    try:
+        server.run()
+    except KeyboardInterrupt:
+        print("\n[Main] Ctrl+C received, shutting down...")
+        server.should_exit = True
+    finally:
+        # Best-effort extra nudge
+        try:
+            server.force_exit = True
+        except Exception:
+            pass
 
 def main():
     parser = argparse.ArgumentParser(description="The Whetstone Application Launcher")
