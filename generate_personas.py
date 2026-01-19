@@ -4,11 +4,17 @@ import glob
 import json
 import re
 import sys
+import zipfile
+from datetime import datetime
 from openai import OpenAI
+from auto_curator_v3 import apply_exclusions
 
 
 LIBRARY_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'philosophy_library')
+CURATED_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'curated')
+METADATA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), '.metadata_v3')
 PERSONAS_PATH = os.path.join(LIBRARY_PATH, 'personas.json')
+CODEX_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'codex_library', 'philosophy')
 
 # Connect to Ollama server (OpenAI API compatible)
 client = OpenAI(
@@ -16,8 +22,8 @@ client = OpenAI(
     api_key="ollama"
 )
 
-# Default LLM model - configurable via environment variable
-LLM_MODEL = os.getenv("WHETSTONE_MODEL", "cogito:8b")
+# Persona generation model can be independent of curation
+PERSONA_MODEL = os.getenv("WHETSTONE_PERSONA_MODEL", os.getenv("WHETSTONE_MODEL", "cogito:8b"))
 
 
 def normalize_author_name(name):
@@ -42,6 +48,55 @@ def normalize_author_name(name):
         return "ken tsugi"
     return " ".join(tokens)
 
+
+def slugify(text):
+    slug = re.sub(r"[^a-zA-Z0-9]+", "-", text.strip())
+    slug = re.sub(r"-+", "-", slug).strip("-")
+    return slug.lower() or "codex"
+
+
+def bump_version(existing_version):
+    try:
+        parts = existing_version.split(".")
+        if len(parts) == 3:
+            parts[2] = str(int(parts[2]) + 1)
+            return ".".join(parts)
+    except Exception:
+        pass
+    return "0.1.0"
+
+
+def load_codex_manifest(slug):
+    json_path = os.path.join(CODEX_PATH, f"{slug}.codex.json")
+    zip_path = os.path.join(CODEX_PATH, f"{slug}.codex")
+
+    if os.path.exists(json_path):
+        with open(json_path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+
+    if os.path.exists(zip_path):
+        try:
+            with zipfile.ZipFile(zip_path, 'r') as zf:
+                with zf.open('codex.json') as mf:
+                    return json.loads(mf.read().decode('utf-8'))
+        except Exception:
+            return None
+    return None
+
+
+def write_codex_manifest(slug, manifest):
+    json_path = os.path.join(CODEX_PATH, f"{slug}.codex.json")
+    zip_path = os.path.join(CODEX_PATH, f"{slug}.codex")
+
+    os.makedirs(CODEX_PATH, exist_ok=True)
+
+    with open(json_path, 'w', encoding='utf-8') as f:
+        json.dump(manifest, f, ensure_ascii=False, indent=2)
+
+    with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr('codex.json', json.dumps(manifest, ensure_ascii=False, indent=2))
+
+
 def extract_author(filename):
     # Try to extract author from filename: e.g. "nietzsche_Beyond Good and Evil by Friedrich Wilhelm Nietzsche.txt"
     base = os.path.splitext(filename)[0]
@@ -56,28 +111,89 @@ def extract_author(filename):
 
 
 
-def sample_text_for_author(files, max_chars=1200, deep_scan=False):
-    """Concatenate and sample up to max_chars from the author's works, or all text if deep_scan. Prefer text between ---BEGIN AUTHOR TEXT--- and ---END AUTHOR TEXT--- markers if present."""
+def load_clean_text(filename):
+    """Load curated text if available; otherwise apply exclusions from metadata."""
+    curated_file = os.path.join(CURATED_PATH, filename)
+    metadata_file = os.path.join(METADATA_PATH, os.path.splitext(filename)[0] + ".metadata.json")
+    raw_file = os.path.join(LIBRARY_PATH, filename)
+    provenance_model = None
+
+    try:
+        if os.path.exists(curated_file):
+            with open(curated_file, 'r', encoding='utf-8') as f:
+                return f.read(), provenance_model
+
+        with open(raw_file, 'r', encoding='utf-8') as f:
+            raw_text = f.read()
+
+        if os.path.exists(metadata_file):
+            with open(metadata_file, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+            provenance_model = metadata.get("model")
+            exclusions = metadata.get("exclusions", [])
+            clean_text = apply_exclusions(raw_text, exclusions)
+            return clean_text, provenance_model
+
+        return raw_text, provenance_model
+    except Exception:
+        return "", provenance_model
+
+
+def load_text_from_codex(norm):
+    """Return aggregated curated text and provenance from a CODEX if present."""
+    slug = slugify(norm)
+    manifest = load_codex_manifest(slug)
+    if not manifest:
+        return None, None
+
+    curated = []
+    provenance_model = None
+
+    for src in manifest.get("sources", []):
+        if src.get("type", "").startswith("text/plain"):
+            content = src.get("content")
+            if not content:
+                continue
+            if src.get("type") == "text/plain+curated":
+                curated.append(content)
+            elif src.get("curation", {}).get("exclusions"):
+                curated.append(apply_exclusions(content, src["curation"]["exclusions"]))
+            else:
+                curated.append(content)
+            if not provenance_model:
+                provenance_model = src.get("curation", {}).get("model")
+
+    if not curated:
+        return None, provenance_model
+
+    return "\n".join(curated), provenance_model
+
+
+def sample_text_for_author(files, max_chars=1200, deep_scan=False, norm=None):
+    """Use CODEX if available; otherwise sample curated text for the author."""
+
+    if norm:
+        codex_text, prov = load_text_from_codex(norm)
+        if codex_text:
+            return (codex_text if deep_scan else codex_text[:max_chars]), prov
+
     text = ""
+    provenance_model = None
     for fname in files:
-        fpath = os.path.join(LIBRARY_PATH, fname)
-        try:
-            with open(fpath, 'r', encoding='utf-8') as f:
-                content = f.read()
-                # Try to extract only the author text between markers
-                match = re.search(r'---BEGIN AUTHOR TEXT---(.*?)---END AUTHOR TEXT---', content, re.DOTALL | re.IGNORECASE)
-                if match:
-                    author_text = match.group(1).strip()
-                    text += author_text + "\n"
-                else:
-                    text += content + "\n"
-        except Exception as e:
-            continue
+        content, model_used = load_clean_text(fname)
+        if model_used:
+            provenance_model = model_used
+        match = re.search(r'---BEGIN AUTHOR TEXT---(.*?)---END AUTHOR TEXT---', content, re.DOTALL | re.IGNORECASE)
+        if match:
+            author_text = match.group(1).strip()
+            text += author_text + "\n"
+        else:
+            text += content + "\n"
     # For deep scan, cap the total text length and sample from start, middle, and end for diversity
     if deep_scan:
         max_deep_chars = 5000  # Further reduced to help prevent LLM input truncation
         if len(text) <= max_deep_chars:
-            return text
+            return text, provenance_model
         # Sample: first 1/3, middle 1/3, last 1/3 (each ~max_deep_chars//3)
         chunk = max_deep_chars // 3
         first = text[:chunk]
@@ -86,8 +202,8 @@ def sample_text_for_author(files, max_chars=1200, deep_scan=False):
         last = text[-chunk:]
         sampled = first + "\n...\n" + middle + "\n...\n" + last
         print(f"[INFO] Deep scan: sampled {len(sampled)} chars from {len(text)} total.")
-        return sampled
-    return text[:max_chars]
+        return sampled, provenance_model
+    return text[:max_chars], provenance_model
 
 
 def generate_meta_prompt(author, sample_text):
@@ -102,9 +218,9 @@ def generate_meta_prompt(author, sample_text):
     style_summary = None
     for attempt in range(3):
         try:
-            print(f"[INFO] Requesting style summary for {author} using {LLM_MODEL} (attempt {attempt+1}/3)...")
+            print(f"[INFO] Requesting style summary for {author} using {PERSONA_MODEL} (attempt {attempt+1}/3)...")
             response = client.chat.completions.create(
-                model=LLM_MODEL,
+                model=PERSONA_MODEL,
                 messages=[
                     {"role": "system", "content": style_system},
                     {"role": "user", "content": style_user}
@@ -144,9 +260,9 @@ def generate_meta_prompt(author, sample_text):
 
     for attempt in range(3):
         try:
-            print(f"[INFO] Requesting persona prompt for {author} using {LLM_MODEL} (attempt {attempt+1}/3)...")
+            print(f"[INFO] Requesting persona prompt for {author} using {PERSONA_MODEL} (attempt {attempt+1}/3)...")
             response = client.chat.completions.create(
-                model=LLM_MODEL,
+                model=PERSONA_MODEL,
                 messages=[
                     {"role": "system", "content": prompt_system},
                     {"role": "user", "content": prompt_user}
@@ -168,6 +284,41 @@ def generate_meta_prompt(author, sample_text):
             break
     print(f"[ERROR] Failed to generate a valid persona prompt for {author} after 3 attempts. Using fallback.")
     return f"You are {author}, a philosopher. Answer as {author} would, using their style and core ideas."
+
+
+def update_codex_with_persona(norm, display_name, prompt, source_files, provenance_model):
+    """Append persona prompt provenance into the author's CODEX if present."""
+    slug = slugify(norm)
+    manifest = load_codex_manifest(slug)
+    if not manifest:
+        return
+
+    now = datetime.utcnow().isoformat() + "Z"
+    meta = manifest.setdefault("meta", {})
+    meta.setdefault("name", display_name)
+    meta.setdefault("category", "philosophy")
+    meta.setdefault("version", "0.1.0")
+    meta["updated_at"] = now
+    meta["version"] = bump_version(meta.get("version", "0.1.0"))
+    manifest.setdefault("instructions", {})["system_prompt_hint"] = prompt
+
+    prov = manifest.setdefault("provenance", {})
+    persona_logic = prov.setdefault("persona_generation", {})
+    persona_logic.update({
+        "model": PERSONA_MODEL,
+        "generated_at": now,
+        "source_files": source_files,
+        "curation_model": provenance_model,
+    })
+
+    manifest.setdefault("history", []).append({
+        "version": meta.get("version"),
+        "date": now,
+        "action": "persona-update",
+        "notes": "Persona prompt refreshed",
+    })
+
+    write_codex_manifest(slug, manifest)
 
 
 
@@ -201,17 +352,39 @@ def main():
     for norm, files in author_files.items():
         display_name = author_display[norm]
         if norm not in personas:
-            sample = sample_text_for_author(files, deep_scan=deep_scan)
+            sample, provenance_model = sample_text_for_author(files, deep_scan=deep_scan, norm=norm)
             prompt = generate_meta_prompt(display_name, sample)
             personas[norm] = {
                 "name": display_name,
                 "prompt": prompt,
-                "library_filter": [display_name]
+                "library_filter": [display_name],
+                "built_with_model": PERSONA_MODEL,
+                "provenance_model": provenance_model,
+                "is_mod": False,
+                "source_files": files
             }
+            update_codex_with_persona(norm, display_name, prompt, files, provenance_model)
             print(f"Added persona for {display_name} (key: {norm}).")
             updated = True
+        else:
+            persona = personas[norm]
+            if "built_with_model" not in persona:
+                persona["built_with_model"] = PERSONA_MODEL
+                updated = True
+            if "provenance_model" not in persona:
+                persona["provenance_model"] = None
+                updated = True
+            if "is_mod" not in persona:
+                persona["is_mod"] = False
+                updated = True
+            if "source_files" not in persona:
+                persona["source_files"] = files
+                updated = True
+            # Update CODEX with existing prompt if present
+            if persona.get("prompt"):
+                update_codex_with_persona(norm, display_name, persona["prompt"], files, persona.get("provenance_model"))
+
     if updated:
-        # Write the full LLM output for each persona prompt to personas.json (no truncation here)
         with open(PERSONAS_PATH, 'w', encoding='utf-8') as f:
             json.dump(personas, f, indent=2, ensure_ascii=False)
         print(f"Updated personas.json with {len(personas)} authors.")
