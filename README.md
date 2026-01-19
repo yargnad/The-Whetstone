@@ -14,6 +14,13 @@ The Whetstone is a **physical AI device** that acts as a Socratic interlocutorâ€
 
 **Core Philosophy:** Privacy-first cognitive strengthening through local AI inference. Your conversations never leave your home. Your thinking process is sovereign.
 
+## Current Software Flow (What Happens With Your Texts)
+
+- Drop raw `.txt` sources into `philosophy_library/` (that folder now holds only source texts).
+- The curator (`auto_curator_v3`) cleans each source, writing curated text to `curated/` and a CODEX manifest (ignored by git) for auditability.
+- Persona generation samples curated text (or the CODEX) to build/refresh prompts in `personas.json` and logs those prompts back into the CODEX manifest.
+- RAG uses the curated text; export/import uses CODEX via the external `codepax-cli` repo.
+
 ---
 
 ## The Two Paths: Core & Pro

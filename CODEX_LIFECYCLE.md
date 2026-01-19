@@ -6,12 +6,12 @@ This document outlines the detailed workflows for the CODEX ecosystem, separatin
 
 The CODEX format (`.codex`) is the universal container. **codepax** is the package manager. **The Whetstone** (and future apps) are the "Editors" or "Runtimes".
 
-- **The Whetstone**: Philosophy-centric. Uses `auto_curator` to process Project Gutenberg texts into philosoper personas.
+- **The Whetstone**: Philosophy-centric. Uses `auto_curator_v3` (exclusion-based) to process public-domain texts into curated sources and CODEX manifests.
 - **Eidolon Triptych**: Fiction-centric. Uses similar logic to create character personas from fiction texts.
 - **codepax**: The "Jack of All Trades" Builder. A universal tool to build, pack, and validate CODEX files without knowing what's inside.
 - **The Whetstone**: The Interface. It uses `codepax` to package its specific domain knowledge (philosophy, curated text) into the standard format.
 
-> **Note on Philosophy**: The concepts below (Ingredients, Recipes, Workflows) are design principles for the CODEX specifications. They ensure the format is self-describing and ubiquitous. However, **The Whetstone's core local loop remains unchanged**: it will still watch the library folder and process raw text files directly. CODEX is the *Interchange Layer* for portability.
+> **Note on Philosophy**: The concepts below (Ingredients, Recipes, Workflows) are design principles for the CODEX specifications. They ensure the format is self-describing and ubiquitous. The Whetstone's core loop remains: watch the library for raw text, curate, and generate personas. CODEX is the *interchange layer* the device now emits automatically.
 
 ---
 
@@ -23,8 +23,8 @@ The import process is designed to be "unpaxing" rather than "loading". It treats
 
 1.  **Validation**: `codepax` validates the file integrity and schema.
 2.  **Extraction (Unpaxing)**:
-    - **Ingredients (Source Texts)**: Extracted directly to the active library directory (e.g., `philosophy_library/`). This ensures the raw data is available for RAG and future processing.
-    - **Metadata & Definitions**: Extracted and injected into the system's central registry (e.g., `personas.json` or a SQLite DB).
+    - **Ingredients (Source Texts)**: Extracted directly to the active library directory (e.g., `philosophy_library/`). This keeps raw data available for RAG and future processing.
+    - **Metadata & Definitions**: Extracted and injected into the system's central registry (e.g., `personas.json`), with CODEX cached for audit.
 3.  **Hydration**:
     - The persona is now "live". The system references the extracted source files and the injected metadata.
     - No further processing is required; the CODEX file contained everything needed.
@@ -46,9 +46,9 @@ Exporting is the process of gathering a scattered entity (source files, prompts,
     - Retrieve the Persona Definition (system prompt, parameters).
     - Retrieve Metadata (Author, created_by, timestamps).
 2.  **Noise Elimination (The Curator)**:
-    - *If receipts don't exist:* The system triggers **The Curator** (using Qwen3 8B or similar local LLM) to analyze the source files.
-    - **Logic**: The Curator scans the beginning and end of files to identify non-authorial text (Project Gutenberg headers, transcriber notes, etc.).
-    - **Output**: A "Recipe" (regex/line-range filters) is generated and stored. It does *not* destructively edit the source files; it stores the *instructions* on how to read them cleanly.
+    - *If receipts don't exist:* The system triggers **auto_curator_v3** (using Qwen3 8B or similar local LLM) to analyze the source files.
+    - **Logic**: The Curator uses exclusion ranges (headers, footnotes, translator/editor notes) instead of start/end boundaries.
+    - **Output**: Exclusion ranges are stored; curated text is written; a CODEX manifest is updated with raw+clean hashes, exclusions, provenance, and prompts when persona generation runs.
 3.  **Packing**:
     - The gathered artifacts (Ingredients + Recipes + Metadata + Prompts) are bundled into the `.codex` container.
 4.  **Result**: A fully hydrated (Dense), portable file that can be sent to another device and "unpaxed" to perfectly replicate the persona.
@@ -73,12 +73,13 @@ It is important to distinguish between the **Device Workflow** and the **portabi
 
 ### Device Workflow (The Whetstone)
 - **Watcher**: The system watches `philosophy_library/` for *any* new text file.
-- **Auto-Curation**: When a text file drops, `generate_personas.py` kicks in, runs the noise elimination, generates a prompt, and creates a persona entry.
-- **No CODEX needed**: The device works perfectly fine with just raw text files.
+- **Auto-Curation**: `auto_curator_v3` runs exclusion-based cleaning, writes curated text to `curated/`, and emits a dense CODEX manifest with raw+clean text, exclusions, hashes, and provenance.
+- **Persona Generation**: `generate_personas.py` samples curated/CODEX text, generates persona prompts, updates `personas.json`, and logs prompts back into the CODEX manifest.
+- **RAG**: Uses curated text; CODEX remains the auditable interchange artifact.
 
 ### Interchange Workflow (CODEX)
-- **Export**: "Pack up this working persona so I can send it to my friend or use it in Gemini Studio."
-- **Import**: "Unpack this box of ingredients and recipes into my library so my local watcher can ingest them (or ingest them directly)."
+- **Export**: Already happening during curation/persona generation; CODEX lives in `codex_library/` (ignored by git) ready to share.
+- **Import**: "Unpack this box of ingredients and recipes into my library so my local watcher can ingest them." CODEX can restore raw + curated text and prompts.
 
 
 ---
