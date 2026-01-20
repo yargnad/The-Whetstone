@@ -146,6 +146,10 @@
             <!-- Chat View -->
             <div id="view-chat" class="view-container active">
                 <div id="chat-messages" class="chat-messages">
+                    <div id="chat-status-indicator" class="chat-status-banner" style="display: none;">
+                        <span class="spinner">⚙️</span>
+                        <span id="chat-status-text">Generating Persona...</span>
+                    </div>
                     <div class="welcome-message">
                         <h2>Welcome to The Whetstone</h2>
                         <p>Select a persona from the sidebar to begin your philosophical dialogue.</p>
@@ -230,7 +234,8 @@
                             </select>
                         </label>
                         <button id="scan-personas-btn" class="toolbar-btn">🔄 Scan for Personas</button>
-                        <button id="persona-reload-btn" class="toolbar-btn" title="Reload personas from disk (apply new CODEX)">♻️ Reload Personas</button>
+                        <button id="persona-reload-btn" class="toolbar-btn"
+                            title="Reload personas from disk (apply new CODEX)">♻️ Reload Personas</button>
                         <button id="export-all-btn" class="toolbar-btn">📦 Export All as CODEX</button>
                         <label class="scan-mode-toggle" style="margin-left: auto;">
                             <span>Auto-generate pending on chat</span>
@@ -271,6 +276,8 @@
                         </div>
                         <div class="modal-footer">
                             <button id="modal-select-btn" class="toolbar-btn">Select Persona</button>
+                            <button id="modal-refine-btn" class="toolbar-btn"
+                                title="Re-generate prompt using latest analysis">✨ Refine</button>
                             <button id="modal-export-btn" class="toolbar-btn">📦 Export CODEX</button>
                             <button id="modal-save-btn" class="toolbar-btn">Save Changes</button>
                         </div>
@@ -427,7 +434,8 @@
                             <input type="checkbox" id="config-chorus-toggle" class="toggle-input">
                             <span class="toggle-slider"></span>
                         </label>
-                        <p class="form-hint">Chorus is a hive-mind philosopher persona that can draw from the entire library.</p>
+                        <p class="form-hint">Chorus is a hive-mind philosopher persona that can draw from the entire
+                            library.</p>
                     </div>
                 </div>
 
@@ -438,6 +446,21 @@
             </div>
 
         </main>
+    </div>
+
+    <!-- System Status Flyout -->
+    <div id="system-status-flyout" class="status-flyout" style="display: none;">
+        <div class="flyout-header">
+            <span class="flyout-title">⚙️ System Activity</span>
+            <button id="flyout-close-btn" class="flyout-close">&times;</button>
+        </div>
+        <div class="flyout-body">
+            <div id="flyout-activity-text" class="flyout-text">Idle</div>
+            <div class="flyout-progress-container">
+                <div id="flyout-progress-bar" class="flyout-progress-bar" style="width: 0%"></div>
+            </div>
+            <div id="flyout-logs" class="flyout-logs"></div>
+        </div>
     </div>
 
     <script src="/static/app.js"></script>

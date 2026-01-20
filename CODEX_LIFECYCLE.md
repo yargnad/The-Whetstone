@@ -19,15 +19,18 @@ The CODEX format (`.codex`) is the universal container. **codepax** is the packa
 
 The import process is designed to be "unpaxing" rather than "loading". It treats the CODEX file as a self-contained archive that explodes into the system seamlessly.
 
-### Workflow: `codepax pull file.codex`
+### Path A: The Archive Drop (CODEX)
+1.  **Watcher**: Monitors `codex_library/` for `.codex` files.
+2.  **Explosion**: Unpacks to `curated_library/` (Runtime Cache).
+3.  **Result**: Instant availability to RAG.
 
-1.  **Validation**: `codepax` validates the file integrity and schema.
-2.  **Extraction (Unpaxing)**:
-    - **Ingredients (Source Texts)**: Extracted directly to the active library directory (e.g., `philosophy_library/`). This keeps raw data available for RAG and future processing.
-    - **Metadata & Definitions**: Extracted and injected into the system's central registry (e.g., `personas.json`), with CODEX cached for audit.
-3.  **Hydration**:
-    - The persona is now "live". The system references the extracted source files and the injected metadata.
-    - No further processing is required; the CODEX file contained everything needed.
+### Path B: The Raw Drop (Hybrid)
+1.  **Watcher**: Monitors `raw/` for text files (e.g., `nietzsche_notes.txt`).
+2.  **The Fork**:
+    -   *If CODEX exists:* Appends the file to `codex_library/Friedrich_Nietzsche.codex`.
+    -   *If New:* Generates a new `New_Persona.codex` in `codex_library/`.
+3.  **The Merge**: Once the CODEX is updated/created, it triggers **Path A** automatically.
+4.  **Result**: Raw files are never processed directly; they are always "paxed" first for auditability.
 
 ### Key Concept: "Self-Healing" Import
 If source files are missing or corrupted, the CODEX file (which serves as the source of truth) can re-extract them.
@@ -72,14 +75,17 @@ The "Curator" is the intelligent filter that ensures high-quality input for the 
 It is important to distinguish between the **Device Workflow** and the **portability Workflow**.
 
 ### Device Workflow (The Whetstone)
-- **Watcher**: The system watches `philosophy_library/` for *any* new text file.
-- **Auto-Curation**: `auto_curator_v3` runs exclusion-based cleaning, writes curated text to `curated/`, and emits a dense CODEX manifest with raw+clean text, exclusions, hashes, and provenance.
-- **Persona Generation**: `generate_personas.py` samples curated/CODEX text, generates persona prompts, updates `personas.json`, and logs prompts back into the CODEX manifest.
-- **RAG**: Uses curated text; CODEX remains the auditable interchange artifact.
+- **Runtime (Fast Path)**: The RAG engine and Persona System only ever look at `curated_library/` (the exploded cache). This ensures zero-latency access.
+- **Storage (Source of Truth)**: `codex_library/` holds the immutable `.codex` containers.
+- **Updates (The Cycle)**:
+    1.  **Ingest**: You drop a new raw text file (e.g., `notes.txt`) for a persona.
+    2.  **Pack**: The system immediately *appends* this file to the existing `.codex` container (creating a new version).
+    3.  **Explode**: The system "re-explodes" the updated CODEX into `curated_library/`, making the new knowledge available to RAG.
+    4.  **Result**: The CODEX remains the master record; the curated folder is just a disposable cache.
 
 ### Interchange Workflow (CODEX)
-- **Export**: Already happening during curation/persona generation; CODEX lives in `codex_library/` (ignored by git) ready to share.
-- **Import**: "Unpack this box of ingredients and recipes into my library so my local watcher can ingest them." CODEX can restore raw + curated text and prompts.
+- **Export**: Generates a `.codex` file from the current state.
+- **Import**: Dropping a `.codex` file triggers the "Explosion" workflow described above.
 
 
 ---
@@ -90,7 +96,14 @@ CODEX files will evolve beyond static data into **Agentic Workflows**.
 - **Structure**: A CODEX file could contain a `workflow.yaml` defining a sequence of actions.
 - **Self-Description**: Opening the file tells the AI agent exactly what to do (e.g., "This contains a Python script and a dataset; run the script on the data and summarize the output").
 - **IDE Assistant**: A "project" could be a CODEX file. The AI opens it, understands the context, and becomes a specialized assistant for that specific domain immediately.
+- **IDE Assistant**: A "project" could be a CODEX file. The AI opens it, understands the context, and becomes a specialized assistant for that specific domain immediately.
 - **Plugins**: `codepax` plugins will allow third-party tools to define their own execution logic for these workflow files.
+
+### 5a. The Codepax Persona Plugin (Future)
+To decouple persona generation from *The Whetstone*, a "Persona Plugin" for `codepax` will be developed.
+-   **Function**: Wraps the `auto_curator` logic into a set of tools (functions) callable by `functiongemma`.
+-   **Usage**: `codepax build --plugin persona --url http://gutenberg.org/ebooks/1234`
+-   **Result**: A valid Whetstone-compatible CODEX file generated entirely within the `codepax` environment, without needing the full Whetstone app.
 
 ## 6. Semantic Portability (The "Drop & Play" Vision)
 To achieve true interoperability with advanced AI models (Gemini, Claude, ChatGPT), the CODEX structure uses self-descriptive semantic keys.
@@ -107,13 +120,46 @@ The ultimate goal is for CODEX to become a ubiquitous standard for AI context an
 - **Eidolon Triptych Example**: A fiction-focused fork would use the *same* CODEX format but different "fragmentation" logic to assemble characters from novels.
 - **Universal Utility**: A CODEX file is a "box of folders and files" that any qualified assistant (The Whetstone, ChatGPT, Claude) can open and understand immediately using the self-descriptive instructions inside.
 
-## 8. Semantic Schema Specification (v2.0)
+## 9. Persona Tiers & On-Demand Refinement
+To optimize resource usage (since generating a rich psychological profile requires reading the entire corpus), we use a two-tier system:
+
+### 9.1 Basic Persona (Ingest Default)
+-   **Trigger**: Automatic on drag-and-drop or migration.
+-   **Methodology**:
+    -   *Text*: Cleaned via Auto-Curator (Regex/AI).
+    -   *Prompt*: Uses a generic template: "You are {Author}. Answer as you would in your writings."
+-   **Cost**: Almost zero.
+-   **Status**: Ready immediately.
+
+### 9.2 Refined Persona (User Activated)
+-   **Trigger**: **Manual User Action** ("Refine Persona" button on the card).
+-   **Methodology**:
+    -   *Analysis*: AI reads the full corpus to detect themes, writing style, and philosophy.
+    -   *Generation*: Writes a detailed `system_prompt` (psychological profile).
+-   **Cost**: High (Token/Compute intensive).
+-   **Status**: "Refined" tag applied to CODEX.
+
+### 9.3 The Refinement Workflow
+1.  **Ingest**: User drops `nietzsche.txt`. System creates **Basic** Nietzsche instantly.
+2.  **Evaluate**: User chats. If satisfied, they stop here.
+3.  **Refine**: User clicks **"Refine Persona"**.
+    -   System runs `generate_personas.py --author nietzsche`.
+    -   Detailed profile replaces the generic prompt.
+    -   CODEX is updated to version `vX.X-refined`.
+
+## 10. Semantic Schema Specification (v2.0)
 To maximize interpretability by AI agents, key names are verbose and self-descriptive.
 
-### `codex_manifest.json` Structure
+> **Architecture Note**: The CODEX Core Specification defines the container (`manifest`, `ingredients`, `recipes`). The **Persona Schema** below is a *Whetstone-specific extension* payload carried within that container. Future apps (e.g., *Codepax*) will validate the container structure but ignore the specific domain payload unless configured to understand it.
+
+### `codex_manifest.json` Structure (Whetstone Persona Variant)
 ```json
 {
   "codex_format_version": "2.0",
+  "meta": {
+      "curation_level": "refined",  // or "basic"
+      "latest_layer_version": "v1.2"
+  },
   "persona_identity": {
     "name": "Friedrich Nietzsche",
     "role_description": "19th Century German Philosopher, focus on nihilism and will to power",
@@ -146,11 +192,115 @@ To maximize interpretability by AI agents, key names are verbose and self-descri
       "description": "Secondary source text"
     }
   ],
+  "analysis_artifacts": {
+      "notes": "Stored outputs from the Persona Generator to avoid re-reading execution.",
+      "style_summary": "Aphoristic, incendiary, prone to exclamation...",
+      "philosophical_pillars": ["Will to Power", "Eternal Recurrence", "Amor Fati"]
+  },
+  "layers": [
+      {
+          "id": "v1.0-basic",
+          "name": "Basic Import",
+          "curation_level": "basic",
+          "model": "regex",
+          "prompt": "You are Friedrich Nietzsche...",
+          "created_at": "2024-01-19T10:00:00Z"
+      },
+      {
+          "id": "v1.2-refined",
+          "name": "Deep Clean (Qwen3)",
+          "curation_level": "refined",
+          "model": "qwen2.5:32b",
+          "prompt": "You are the Dynamite...",
+          "created_at": "2024-01-20T12:00:00Z"
+      }
+  ],
   "agentic_workflow_hints": {
-    "on_open": "adopt_persona",
+    "on_open": "adopt_active_layer", 
     "context_handling": "rag_indexing_required"
   }
 }
 ```
+
+## 11. Distribution & Packaging Strategies
+To balance portability vs. "out-of-the-box" readiness, The Whetstone supports three release bundles:
+
+| Bundle Type | Contents | Pros | Cons | Startup Action |
+| :--- | :--- | :--- | :--- | :--- |
+| **Lightweight** (Source) | App + `raw/` | Smallest size; Max flexibility | Longest startup (must curate & generate) | **Full Ingest**: Curation -> CODEX Gen -> Explosion |
+| **Standard** (Default) | App + `codex_library/` | Balanced; No AI Curation needed | Moderate size; Must unzip on launch | **Explosion**: Unpacks CODEX -> `curated/` |
+| **Heavy** (Runtime) | App + `codex_library/` + `curated/` | Zero setup; Instant RAG | Largest size (>2x storage) | **None**: Ready to query immediately |
+
+### Strategy Recommendation
+-   **GitHub / Source**: Use **Lightweight**. Git tracks raw text better than binaries.
+-   **General User Download**: Use **Standard**. Offers the best balance; "installing" (exploding) is a familiar one-time cost.
+-   **Demo / Kiosk**: Use **Heavy**. When immediate performance is critical and disk space is irrelevant.
+
+## 12. Hardware Paradigms
+The Whetstone ecosystem spans two distinct hardware profiles:
+
+### A. The Tabletop Device (Offline / Air-Gapped)
+-   **Philosophy**: "Digital Monastery". A focused, distraction-free reading and contemplation device.
+-   **Connectivity**: Offline by design.
+-   **Content Source**: Imports content exclusively via physical media (USB) or local network drops (`codex_library/`).
+-   **Role**: The pure runtime and consumption engine.
+
+### B. The Whetstone PC (Connected / Creator)
+-   **Philosophy**: "The Scriptorium". A connected research and curation station.
+-   **Connectivity**: Online.
+-   **Features**:
+    -   **PG Browser**: Built-in browser for Project Gutenberg to find and download texts directly.
+    -   **1-Click Curate**: Download -> Auto-Curate -> Pack to CODEX in one seamless flow.
+    -   **Sync**: Pushes generated CODEX files to the Tabletop Device via USB or local sync.
+
+## 13. The AI-Powered Package Manager (Codepax Ecosystem)
+The `codepax` CLI encapsulates the world's first **AI-Powered Package Ecosystem**. It uses a modular plugin architecture orchestrated by `functiongemma`.
+
+### Architecture
+-   **The Engine**: `functiongemma` (or equivalent). It reads schemas and decides which plugin functions to call to satisfy a user request.
+-   **Core Plugin (Project Gutenberg)**:
+    -   *Role*: The trusted supply chain.
+    -   *Function*: Browses, validates, and fetches raw text from PG. Builds a generic, valid CODEX container.
+-   **Extension Plugins**:
+    -   **The Whetstone Plugin**: Extends the Core. Analyzes texts to generate **Philosophical Personas**.
+    -   **Eidolon Plugin**: Extends the Core. Analyzes texts to destructure and reconstruct **Fictional Characters** (e.g., Tyler Durden).
+    -   **Codekeeper Plugin**: Analyzes source code to generate **Code Assistants**.
+
+### The Flow
+1.  **User**: `codepax install --url http://pg.org/1234 --as "Tyler Durden"`
+2.  **Engine**:
+    -   Calls **Core Plugin** to fetch text.
+    -   Detects intent ("Tyler Durden" = Character).
+    -   Calls **Eidolon Plugin** to extract character traits and dialogue.
+    -   Calls **Eidolon Plugin** to extract character traits and dialogue.
+3.  **Result**: A fully hydrated, highly specialized CODEX file generated on-the-fly.
+
+## 14. The Universal Compiler (Ops Use Case)
+The user's vision extends CODEX to be a "Universal Dependency Compiler" (similar to Docker + Ansible).
+
+-   **Concept**: A CODEX file is a **self-deploying environment**.
+-   **Example**: `wordpress-win11.codex`
+    -   **Ingredients**:
+        -   `php-8.3-installer.exe` (URI)
+        -   `mysql-installer.msi` (URI)
+        -   `wordpress-core.zip` (Source)
+    -   **Recipes**:
+        -   `install_php`: Unattended install flags for Windows.
+        -   `config_db`: SQL initialization scripts.
+    -   **Agentic Hint**: `"on_hydrate": "deploy_stack"`
+-   **Workflow**:
+    -   User: `codepax hydrate wordpress.codex`
+    -   Engine: Reads the recipe, pulls executables (Ingredients), runs installation (Recipes) indiscriminately handles versions and dependencies.
+-   **Significance**: CODEX becomes the universal "Instruction Set" for computing, whether that instructions is "How to be Nietzsche" or "How to install WordPress".
+
+### Advanced Use Case: Disaster Recovery (The "Lazarus" Protocol)
+The user envisions CODEX as a nuclear-option recovery tool.
+-   **Scenario**: Total system failure.
+-   **Input**: `infrastructure-recovery.codex` + `database-backup.sql`.
+-   **Process**:
+    1.  **AI Orchestration**: Analyzes the CODEX manifest to understand the required environment.
+    2.  **Rebuild**: Pulls dependencies, builds Docker containers, compiles code.
+    3.  **Restore**: Reads domain capabilities to understand how to ingest the raw data backup (e.g., "This is a Postgres dump, pipe it to the db container").
+-   **Result**: A fully restored, running application state from cold storage, zero human intervention required.
 
 

@@ -31,9 +31,9 @@ The Whetstone architecture is bifurcated to serve two distinct roles: the effici
 * **TTS:** **Piper**. Lightweight and fast, running on the CPU/DSP hybrid.
 
 #### 3. Dynamic Persona Injection
-* On boot, the system mounts the `philosophy_library` partition (Read-Only).
-* It scans filenames (e.g., `nietzsche_Twilight.txt`) to build the RAG index in memory.
-* **User Action:** To add a persona, the user boots into Maintenance Mode and copies a `.txt` file to the library partition. The system handles the rest.
+* **Runtime:** On boot, the system mounts the `curated_library` partition (Read-Only exploded cache).
+* **Ingestion:** To add a persona, the user copies a `.codex` (or raw text) file to the `ingest_tray/`.
+* **Process:** The system validates, updates the CODEX store, and "explodes" the clean data to the `curated_library` for the runtime to see.
 
 ---
 
@@ -55,11 +55,18 @@ The Whetstone architecture is bifurcated to serve two distinct roles: the effici
 * **TTS:** **Paroli**. A port of Piper TTS accelerated for the RK3588 NPU, enabling near-instant speech generation even for long philosophical monologues.
 
 #### 3. The Persona Forge (Dynamic)
-* **Watcher Service:** Monitors `philosophy_library/` for changes.
-* **Auto-Ingest:** When a new file is detected (e.g., `marcus_Meditations.txt`):
-    1.  The text is chunked and embedded into ChromaDB.
-    2.  A new entry is added to `personas.json`.
-    3.  The Persona becomes immediately selectable via Voice or UI.
+
+* **Dual Watcher:**
+    1.  `codex_library/`: For portable archives (Interchange).
+    2.  `raw/`: For loose text files (Quick Drop).
+* **The "Auto-Packer" Loop**:
+    -   **Event**: New file in `raw/` (e.g., `zen.txt`).
+    -   **Action**: System wraps `zen.txt` into `Zen.codex`.
+    -   **Side Effect**: This change to `codex_library/` triggers the **Auto-Explosion**.
+* **Auto-Explosion**:
+    1.  The CODEX is unpaxed to `curated_library/`.
+    2.  The RAG indexer (ChromaDB) consumes the *curated* files only.
+    3.  The Persona becomes immediately selectable.
 
 ---
 

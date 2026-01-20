@@ -64,6 +64,11 @@ codex_library/
 
 # Curation cache
 philosophy_library/.metadata*/
+.metadata_v3/
+
+# Local Data Storage (Not for repo)
+raw/
+curated/
 
 # Test files
 *.codex

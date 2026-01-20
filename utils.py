@@ -17,9 +17,19 @@ def launch_ollama_server():
     print("[INFO] Ollama server not detected. Launching 'ollama serve' with 16k context window...")
     env = os.environ.copy()
     env["OLLAMA_CONTEXT_LENGTH"] = "16384"
-    # Prefer Vulkan backend and steer to Intel GPU when available
-    env.setdefault("OLLAMA_VULKAN", "1")
-    env.setdefault("OLLAMA_GPU", "intel")
+    
+    # GPU Selection Logic
+    # If WHETSTONE_VULKAN is '1', force Intel/Vulkan (Low Power / iGPU mode).
+    # Otherwise, force disable Vulkan to let Ollama find Nvidia/CUDA (High Performance).
+    if os.getenv("WHETSTONE_VULKAN", "0") == "1":
+        print("[INFO] Mode: Vulkan / Intel iGPU Enabled")
+        env["OLLAMA_VULKAN"] = "1"
+        env["OLLAMA_GPU"] = "intel"
+    else:
+        print("[INFO] Mode: Nvidia / CUDA (Vulkan Disabled)")
+        env["OLLAMA_VULKAN"] = "0"
+        if "OLLAMA_GPU" in env:
+            del env["OLLAMA_GPU"]
     
     stdout_target = subprocess.DEVNULL
     stderr_target = subprocess.DEVNULL

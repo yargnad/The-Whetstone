@@ -3,6 +3,9 @@
  * Handles API communication and UI interactions
  */
 
+// The Whetstone - Frontend Logic
+console.log("Loading App.js v2.1 - Basic/Full Mode Update " + new Date().toISOString());
+
 // API Base URL
 const API_BASE = '';
 
@@ -66,6 +69,7 @@ const personaPrompt = document.getElementById('persona-prompt');
 const modalCloseBtn = document.getElementById('modal-close-btn');
 const modalSelectBtn = document.getElementById('modal-select-btn');
 const modalSaveBtn = document.getElementById('modal-save-btn');
+const modalRefineBtn = document.getElementById('modal-refine-btn');
 const modalExportBtn = document.getElementById('modal-export-btn');
 const exportAllBtn = document.getElementById('export-all-btn');
 
@@ -90,12 +94,35 @@ const symposiumModelSelect = document.getElementById('symposium-model-select');
 const statusBackend = document.getElementById('status-backend');
 const statusPersonas = document.getElementById('status-personas');
 
+// System Status Flyout Elements
+const flyout = document.getElementById('system-status-flyout');
+const flyoutCloseBtn = document.getElementById('flyout-close-btn');
+const flyoutActivityText = document.getElementById('flyout-activity-text');
+const flyoutProgressBar = document.getElementById('flyout-progress-bar');
+const flyoutLogs = document.getElementById('flyout-logs');
+const chatStatusIndicator = document.getElementById('chat-status-indicator');
+const chatStatusText = document.getElementById('chat-status-text');
+
 // =============================================
 // Initialization
 // =============================================
 
 document.addEventListener('DOMContentLoaded', () => {
     init();
+    // Start global monitoring
+    monitorSystemActivity();
+
+    // Debug: Force show flyout for 3s to verify visibility
+    setTimeout(() => {
+        if (flyout) {
+            console.log("[DEBUG] Testing flyout visibility...");
+            flyout.style.display = 'block';
+            if (flyoutActivityText) flyoutActivityText.textContent = "DEBUG: Visibility Test";
+            setTimeout(() => { flyout.style.display = 'none'; }, 3000);
+        } else {
+            console.error("[DEBUG] Flyout element not found!");
+        }
+    }, 1000);
 });
 
 async function init() {
@@ -154,6 +181,7 @@ async function loadPersonas() {
             option.dataset.category = persona.category || '';
             option.dataset.description = persona.description || '';
             option.dataset.pending = persona.pending ? 'true' : 'false';
+            option.dataset.basic = persona.basic_mode ? 'true' : 'false';
             if (persona.name === data.current) {
                 option.selected = true;
                 currentPersona = persona.name;
@@ -204,8 +232,8 @@ async function loadConfig() {
             const opt = [...modelSelect.options].find(o => o.value === currentModel);
             if (opt) opt.selected = true;
         }
-            // Rebuild model dropdowns now that we have config defaults
-            await loadModels();
+        // Rebuild model dropdowns now that we have config defaults
+        await loadModels();
     } catch (error) {
         console.error('Failed to load config:', error);
     }
@@ -354,10 +382,17 @@ async function selectPersona(name) {
     const opt = [...personaSelect.options].find(o => o.value === name);
     const isPending = opt && opt.dataset.pending === 'true';
     const autogenEnabled = autogenToggle ? autogenToggle.checked : true;
-    if (isPending && !autogenEnabled) {
-        const proceed = confirm('This persona is pending generation. Generate it now?');
-        if (!proceed) return;
-        await triggerPersonaGeneration(name);
+
+    // Auto-generate if pending
+    if (isPending) {
+        if (!autogenEnabled) {
+            const proceed = confirm('This persona is pending generation. Generate it now?');
+            if (!proceed) return;
+        }
+        // Trigger generation (async, don't await blocking selection entirely, but maybe we should?)
+        // Better to await it so the status sets to 'running' before we select, 
+        // ensuring the UI picks up the state.
+        triggerPersonaGeneration(name);
     }
 
     const previous = currentPersona || personaSelect.value;
@@ -762,6 +797,125 @@ function scrollToBottom() {
 function autoResizeTextarea() {
     chatInput.style.height = 'auto';
     chatInput.style.height = Math.min(chatInput.scrollHeight, 200) + 'px';
+}
+
+// =============================================
+// System Monitoring (Flyout & Chat Indicators)
+// =============================================
+
+async function monitorSystemActivity() {
+    try {
+        // Poll Generation Status
+        const respGen = await fetch(`${API_BASE}/api/personas/generation/status`);
+        const genData = await respGen.json();
+
+        // Poll Scan Status (optional, but good for visibility)
+        const respScan = await fetch(`${API_BASE}/api/personas/scan/status`);
+        const scanData = await respScan.json();
+
+        updateSystemStatusUI(genData, scanData);
+
+    } catch (error) {
+        // Silent fail on network error to avoid console spam
+    } finally {
+        // Poll every 1.5 seconds
+        setTimeout(monitorSystemActivity, 1500);
+    }
+}
+
+function updateSystemStatusUI(genData, scanData) {
+    let active = false;
+    let activityText = 'Idle';
+    let progress = 0;
+    let logs = '';
+
+    // Priority 1: Generation (User waiting)
+    if (genData && genData.is_running) {
+        active = true;
+        activityText = `Generating Persona: ${genData.persona_name || 'Unknown'}...`;
+        progress = (genData.progress || 0) * 100;
+        logs = genData.output || 'Initializing generation...';
+
+        // Show Chat Indicator if we are in chat view
+        if (chatStatusIndicator) {
+            chatStatusIndicator.style.display = 'flex';
+            if (chatStatusText) chatStatusText.textContent = `Generating ${genData.persona_name}...`;
+            // Optional: Disable input while generating to prevent timeout
+            if (chatInput && !chatInput.disabled) {
+                chatInput.placeholder = "Please wait, generating persona...";
+                chatInput.disabled = true;
+                sendBtn.disabled = true;
+            }
+        }
+    }
+    // Priority 2: Scanning (Background)
+    else if (scanData && scanData.is_running) {
+        active = true;
+        activityText = `Scanning Library (${scanData.mode})...`;
+        progress = 100; // Indeterminate or just full bar
+        logs = scanData.output || 'Scanning...';
+
+        // Hide chat indicator if only scanning
+        if (chatStatusIndicator) chatStatusIndicator.style.display = 'none';
+
+        // Re-enable input if it was disabled by generation
+        if (chatInput && chatInput.disabled && !isStreaming) {
+            enableChat();
+        }
+    }
+    // Idle
+    else {
+        active = false;
+        if (chatStatusIndicator) chatStatusIndicator.style.display = 'none';
+        // Re-enable input if it was disabled
+        if (chatInput && chatInput.disabled && !isStreaming) {
+            enableChat();
+        }
+    }
+
+    // Update Flyout with Persistence Logic
+    if (flyout) {
+        if (active) {
+            flyout.style.display = 'block';
+            if (flyoutActivityText) flyoutActivityText.textContent = activityText;
+            if (flyoutActivityText) flyoutActivityText.style.color = 'var(--text-primary)';
+            if (flyoutProgressBar) flyoutProgressBar.style.width = `${progress}%`;
+            if (flyoutProgressBar) flyoutProgressBar.style.backgroundColor = 'var(--accent-primary)';
+            if (flyoutLogs) flyoutLogs.textContent = logs;
+            if (flyoutLogs) flyoutLogs.scrollTop = flyoutLogs.scrollHeight;
+        }
+        else if (genData && genData.error) {
+            // Error State - PERSIST
+            flyout.style.display = 'block';
+            if (flyoutActivityText) {
+                flyoutActivityText.textContent = 'Generation Failed';
+                flyoutActivityText.style.color = '#ef4444';
+            }
+            if (flyoutProgressBar) {
+                flyoutProgressBar.style.width = '100%';
+                flyoutProgressBar.style.backgroundColor = '#ef4444';
+            }
+            if (flyoutLogs) flyoutLogs.textContent = logs + '\n\nERROR: ' + genData.error;
+        }
+        else if (genData && genData.success) {
+            // Success State - Brief Persist (logic could be handled by timeout, but here just show done)
+            // We rely on backend clearing success state after a timeout? Or just let it fade?
+            // For now, let's keep it visible if the 'success' flag is true, which endpoint returns for a while?
+            // Actually, backend usually clears it. Let's show "Complete" validation.
+            if (flyoutActivityText) flyoutActivityText.textContent = 'Generation Complete';
+            if (flyoutActivityText) flyoutActivityText.style.color = 'var(--success)';
+            if (flyoutProgressBar) {
+                flyoutProgressBar.style.width = '100%';
+                flyoutProgressBar.style.backgroundColor = 'var(--success)';
+            }
+            // Allow user to close it manually or let it persist until next action
+            flyout.style.display = 'block';
+        }
+        else {
+            // Only auto-hide if truly idle and no error/success flagged
+            flyout.style.display = 'none';
+        }
+    }
 }
 
 // =============================================
@@ -1280,15 +1434,42 @@ function populatePersonaGrid() {
             const card = document.createElement('div');
             card.className = 'persona-card';
             const isPending = opt.dataset.pending === 'true';
+            const isBasic = opt.dataset.basic === 'true'; // New flag
+
+            // Logic:
+            // - Pending: Show "Pending" badge, disable Select, show "Generate" (now Upgrade)
+            // - Basic: Show "Basic" badge (optional) or just no badge. Show "Upgrade" button. Selectable.
+            // - Full: No badge. No Upgrade/Generate button (only Config). Selectable.
+
+            // Note: My backend now sets pending=False for Basic personas, so isPending should be false.
+
+            let statusBadge = '';
+            if (isPending) {
+                statusBadge = '<span class="badge pending">Pending</span>';
+            } else if (!isBasic) {
+                // Feature request: Remove "Basic" label, add "✨" to Full personas
+                statusBadge = '<span class="badge full" title="Full AI Persona" style="background:transparent; font-size:1.2em;">✨</span>';
+            }
+
+            let actionButton = '';
+            if (isPending) {
+                actionButton = `<button class="generate-btn" data-persona="${opt.value}">⚒️ Generate</button>`;
+            } else if (isBasic) {
+                actionButton = `<button class="generate-btn" data-persona="${opt.value}">✨ Upgrade</button>`;
+            } else {
+                // Full persona - just Configure
+                actionButton = `<button class="config-btn" data-persona="${opt.value}">⚙️ Configure</button>`;
+            }
+
             card.innerHTML = `
                 <div class="persona-card-header">
                     <h3>${opt.textContent}</h3>
-                    ${isPending ? '<span class="badge pending">Pending</span>' : ''}
+                    ${statusBadge}
                 </div>
-                <p>${isPending ? 'Generation required before use.' : 'Click to select or configure this persona.'}</p>
+                <p>${isPending ? 'Generation required before use.' : (isBasic ? 'Ready to chat. Upgrade for full AI depth.' : 'Click to select or configure this persona.')}</p>
                 <div class="persona-card-actions">
                     <button class="select-btn" data-persona="${opt.value}" ${isPending ? 'disabled' : ''}>Select</button>
-                    ${isPending ? `<button class="generate-btn" data-persona="${opt.value}">⚒️ Generate</button>` : `<button class="config-btn" data-persona="${opt.value}">⚙️ Configure</button>`}
+                    ${actionButton}
                 </div>
             `;
             personaGrid.appendChild(card);
@@ -1315,7 +1496,8 @@ function populatePersonaGrid() {
     personaGrid.querySelectorAll('.generate-btn').forEach(btn => {
         btn.addEventListener('click', async (e) => {
             e.stopPropagation();
-            await triggerPersonaGeneration(btn.dataset.persona);
+            // Upgrade always implies force regeneration (since basic mode already has a prompt)
+            await triggerPersonaGeneration(btn.dataset.persona, true);
         });
     });
 }
@@ -1346,6 +1528,20 @@ function setupPersonaManager() {
     // Modal save button
     if (modalSaveBtn) {
         modalSaveBtn.addEventListener('click', savePersonaPreamble);
+    }
+
+    // Refine button
+    const refineBtn = document.getElementById('refine-persona-btn');
+    if (refineBtn) {
+        refineBtn.addEventListener('click', async () => {
+            if (!currentEditingPersona) return;
+            if (confirm(`Refine ${currentEditingPersona}? This will regenerate the prompt using deep analysis (slow).`)) {
+                // Force regeneration (true)
+                // Also close modal so user sees the flyout
+                closePersonaModal();
+                await triggerPersonaGeneration(currentEditingPersona, true);
+            }
+        });
     }
 
     // Modal export button

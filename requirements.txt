@@ -3,6 +3,8 @@
 
 # Core dependencies (always required)
 openai>=1.0.0          # OpenAI-compatible API client for Ollama
+watchdog>=3.0.0        # File system monitoring
+
 
 # Backend: llama.cpp (optional, for direct inference without Ollama)
 # Uncomment or install separately with: pip install llama-cpp-python

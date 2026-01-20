@@ -118,6 +118,7 @@ def main():
     web_parser.add_argument("--port", type=int, default=8080, help="Bind port")
     web_parser.add_argument("--cert", help="Path to SSL certificate (.crt)")
     web_parser.add_argument("--key", help="Path to SSL private key (.key)")
+    web_parser.add_argument("--vulkan", action="store_true", help="Enable Vulkan/Intel iGPU mode (Default: Off/Nvidia)")
 
     # Legacy CLI Mode
     cli_parser = subparsers.add_parser("cli", help="Run the Legacy Interactive CLI")
@@ -127,6 +128,10 @@ def main():
     if args.mode == "tui":
         run_tui()
     elif args.mode == "web":
+        # Handle Vulkan Toggle
+        if args.vulkan:
+            os.environ["WHETSTONE_VULKAN"] = "1"
+        
         # Auto-detect Tailscale certs if not provided
         cert_file = args.cert
         key_file = args.key

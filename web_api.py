@@ -259,7 +259,21 @@ async def get_config_api():
 async def update_config(request: ConfigRequest):
     if not core:
         raise HTTPException(status_code=503, detail="Core not initialized")
-    config = set_config(request.model_dump(exclude_none=True))
+    
+    # Check if "chorus_enabled" is changing, which requires a persona reload/refresh
+    current_config = get_config()
+    req_dump = request.model_dump(exclude_none=True)
+    
+    needs_refresh = False
+    if "chorus_enabled" in req_dump and req_dump["chorus_enabled"] != current_config.get("chorus_enabled"):
+        needs_refresh = True
+
+    config = set_config(req_dump)
+    
+    if needs_refresh:
+        logger.info("[API] Chorus toggle detected, refreshing personas...")
+        core.refresh_data()
+
     return {"success": True, "config": config}
 
 
@@ -274,6 +288,10 @@ async def list_personas():
         core._ensure_default_persona()
 
     personas = core.get_valid_personas()
+    
+    # Sort by Name (A-Z)
+    sorted_personas = sorted(personas, key=lambda x: x.get("name", "").lower())
+
     return {
         "personas": [
             {
@@ -283,8 +301,9 @@ async def list_personas():
                 "category": p.get("category", "uncategorized"),
                 "source_codex": p.get("source_codex"),
                 "pending": p.get("pending", False),
+                "basic_mode": p.get("basic_mode", False),
             }
-            for p in personas
+            for p in sorted_personas
         ],
         "current": core.current_persona.get("name") if core.current_persona else None
     }
@@ -383,7 +402,8 @@ async def update_persona_config(persona_name: str, request: PersonaConfigRequest
 
 
 @app.post("/api/personas/{persona_name}/generate")
-async def generate_persona(persona_name: str):
+@app.post("/api/personas/{persona_name}/generate")
+async def generate_persona(persona_name: str, force: bool = False):
     """Generate (or finalize) a pending persona (async)."""
     if not core:
         raise HTTPException(status_code=503, detail="Core not initialized")
@@ -404,15 +424,17 @@ async def generate_persona(persona_name: str):
         generation_state.error = None
         generation_state.success = False
 
-    asyncio.create_task(run_generation_task(persona.get("name")))
+    asyncio.create_task(run_generation_task(persona.get("name"), force_regenerate=force))
     return {"success": True, "persona": persona.get("name"), "status": "started"}
 
 
-async def run_generation_task(persona_name: str):
+async def run_generation_task(persona_name: str, force_regenerate: bool = False):
     """Background generation task. Hook curator here."""
+    logger.info(f"[API] STARTING GENERATION TASK for {persona_name} (Force={force_regenerate})")
     try:
         if not core:
-            raise RuntimeError("Core not initialized")
+            logger.error("[API] Core not initialized in generation task")
+            return
 
         config = get_config()
         persona_model = config.get("persona_model") or PERSONA_MODEL
@@ -475,16 +497,77 @@ async def run_generation_task(persona_name: str):
             stats = stats or metadata_payload.get("stats", {}) or {}
             exclusions = exclusions or metadata_payload.get("exclusions", []) or []
 
+        # Extract deep analysis if available
+        style_analysis = metadata_payload.get("style_analysis", {}) if metadata_payload else {}
+
+        # If we have no analysis (Legacy/Basic Codex), perform "Lazy Generation" using the LLM
+        # This fixes the "Instant crappy prompt" issue by actually doing work.
+        if not style_analysis or force_regenerate:
+            # 1. Sample text from the CODEX
+            logger.info(f"[API] Inspecting CODEX files for sampling: {list(other_files.keys())}") # DEBUG
+            sample_text = ""
+            for fname, content in other_files.items():
+                low = fname.lower()
+                if low.endswith((".txt", ".md", ".markdown", ".rst")):
+                    try:
+                        decoded = content.decode("utf-8", errors="ignore")
+                        sample_text = decoded[:4000] 
+                        logger.info(f"[API] Sampled text from: {fname} ({len(sample_text)} chars)")
+                        break
+                    except Exception as e:
+                        logger.warning(f"[API] Failed to decode {fname}: {e}")
+                        continue
+            
+            if sample_text:
+                # 2. Ask LLM to generate a rich Persona Definition directly
+                # We move away from rigid keys to a descriptive "Identity" block to capture historical flavor.
+                gen_prompt = (
+                    f"Analyze this text by {author}:\n\n{sample_text}\n\n"
+                    f"Based on this, write a rich, immersive System Prompt description for {author}.\n"
+                    f"Focus heavily on their specific **Sentence Structure** (e.g. Victorian, Ancient Greek, Modern), **Vocabulary**, and **Tone**.\n"
+                    f"Describe exactly how they should speak and think to be authentic.\n"
+                    f"Output ONLY the description paragraph (e.g. '{author} speaks with archaic latinate diction...'). Do not use bullet points."
+                )
+                try:
+                    # Sync call to backend
+                    response = core.backend.generate_response(
+                        message=gen_prompt, 
+                        system_prompt="You are an expert literary curator. Capture the soul and voice of the author."
+                    )
+                    # Use the raw response as the "Identity"
+                    identity_str = response.strip()
+                    logger.info(f"[API] Generated identity for {author}")
+                    
+                except Exception as e:
+                    logger.error(f"[API] Generation failed: {e}")
+                    identity_str = f"You speak in the authentic voice of {author}, reflecting the style of your era."
+            else:
+                 identity_str = f"You speak in the authentic voice of {author}."
+        
+        else:
+            # Use pre-computed
+            worldview = style_analysis.get("worldview", [])
+            tone = style_analysis.get("tone", [])
+            w_str = "; ".join(worldview) if worldview else ""
+            t_str = ", ".join(tone) if tone else ""
+            identity_str = f"Your worldview is {w_str}. Your tone is {t_str}."
+
+        
         coverage = stats.get("author_percentage")
         coverage_text = f"{coverage}% authorial coverage" if coverage is not None else "curated author text"
+        
+        # New "Natural" Template
         persona_prompt = (
-            f"You are {author}, responding in the first person and grounded strictly in '{title}'. "
-            f"Base every answer on the curated source material ({coverage_text}) curated via {curation.get('curator', 'unknown curator')}. "
-            f"Never mention being an AI. Stay strictly in-character and never reveal or apologize for constraints. "
-            f"Do not use stage directions, throat-clearing, or meta-commentary; speak directly in character. "
-            f"Keep replies concise—no more than two short paragraphs (max ~6 sentences)—but never collapse to yes/no; always provide a substantive, contextual answer. "
-            f"You may apply the author's worldview to modern contexts (e.g., current technology or culture) while keeping tone and values faithful. "
-            f"Persona prompt generated with {persona_model}; when unsure, extrapolate using the author's principles and voice."
+            f"You are {author}. {identity_str}\n\n"
+            f"**Constraints & Instructions**:\n"
+            f"1. Respond in the first person, grounded strictly in '{title}' and your broader philosophy.\n"
+            f"2. Base every answer on the curated source material ({coverage_text}).\n"
+            f"3. {identity_str} (Reinforcing voice).\n"
+            f"4. Never mention being an AI. Stay strictly in-character.\n"
+            f"5. You MAY use stage directions (e.g., *pauses*) to convey emotion.\n"
+            f"6. Do not quote other authors unless explicitly asked.\n"
+            f"7. Speak directly, but with the unique cadence and vocabulary described above.\n"
+            f"Prompt generated with {persona_model}."
         )
         manifest["bootstrap_instructions"] = persona_prompt
 
@@ -503,9 +586,10 @@ async def run_generation_task(persona_name: str):
             ),
             "usage": instructions.get("usage") or (
                 "Stay in-character; ground answers in the curated text; avoid external speculation; "
-                "respond with up to two short paragraphs (never just yes/no); no stage directions or meta-commentary; do not mention system or constraints; "
-                "you may apply the author's worldview to new contexts while preserving their tone and principles."
+                "prioritize voice and immersion over brevity; use stage directions if appropriate; "
+                "do not mention system or constraints; do not quote other authors unless relevant."
             ),
+
             "filters": {
                 "method": curation.get("method"),
                 "exclusion_count": len(exclusions),

@@ -24,6 +24,18 @@ class LLMBackend(abc.ABC):
             Token strings as they're generated
         """
         pass
+
+    def generate_response(self, message: str, system_prompt: str = None) -> str:
+        """Helper to generate a full response string (non-streaming)."""
+        full_prompt = f"{system_prompt}\n\n{message}" if system_prompt else message
+        chunks = []
+        try:
+            for chunk in self.generate(full_prompt, stream=True):
+                chunks.append(chunk)
+            return "".join(chunks)
+        except Exception as e:
+            logger.error(f"Generate response failed: {e}")
+            return ""
     
     @abc.abstractmethod
     def is_available(self) -> bool:

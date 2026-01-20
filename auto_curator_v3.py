@@ -13,6 +13,7 @@ import uuid
 import zipfile
 from datetime import datetime
 from openai import OpenAI
+from utils import is_ollama_running, launch_ollama_server
 
 # Configuration
 MODEL_NAME = os.getenv("WHETSTONE_MODEL", "qwen3:8b")
@@ -31,6 +32,24 @@ client = OpenAI(
     base_url="http://localhost:11434/v1",
     api_key="ollama"
 )
+
+def check_ollama_connection():
+    """Check if Ollama server is reachable, launching it if necessary."""
+    print("   📡 Checking AI Server status...")
+    
+    if is_ollama_running():
+        print("   ✅ AI Server is online.")
+        return True
+        
+    print("   ⚠️ AI Server not running. Attempting to launch...")
+    launch_ollama_server()
+    
+    if is_ollama_running():
+        print("   ✅ AI Server launched successfully.")
+        return True
+    else:
+        print("   ❌ AI Server failed to start.")
+        return False
 
 def char_to_line(text, char_idx):
     """Convert character index to line number."""
@@ -159,25 +178,43 @@ Text to analyze:
 {raw_text[:8000]}
     """
     
+    content = None
+    retries = 3
+    for attempt in range(retries):
+        try:
+            response = client.chat.completions.create(
+                model=MODEL_NAME,
+                messages=[
+                    {'role': 'system', 'content': system_msg},
+                    {'role': 'user', 'content': prompt}
+                ],
+                temperature=0.1,
+                extra_body={"options": {"num_ctx": 16384}}
+            )
+            content = response.choices[0].message.content.strip()
+            content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
+            break # Success
+        except Exception as e:
+            print(f"   ⚠️ AI Error (Attempt {attempt+1}/{retries}): {e}")
+            if attempt < retries - 1:
+                print("   🔄 Attempting to reconnect to AI Server...")
+                if check_ollama_connection():
+                    print("   ✅ Server connection restored.")
+                else:
+                    print("   ❌ Server unavailable.")
+                time.sleep(5)
+            else:
+               # Final attempt failed
+               print("   ❌ AI Unresponsive. Resorting to BASIC curation (Regex only).")
+               return [] # Resiliency: Return empty list to continue
+
+    if not content or content.upper() == "NONE":
+        return []
+    
+    # Parse the response
+    # This is a simple parser - could be improved
+    exclusions = []
     try:
-        response = client.chat.completions.create(
-            model=MODEL_NAME,
-            messages=[
-                {'role': 'system', 'content': system_msg},
-                {'role': 'user', 'content': prompt}
-            ],
-            temperature=0.1,
-            extra_body={"options": {"num_ctx": 16384}}
-        )
-        content = response.choices[0].message.content.strip()
-        content = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL).strip()
-        
-        if content.upper() == "NONE":
-            return []
-        
-        # Parse the response
-        # This is a simple parser - could be improved
-        exclusions = []
         sections = content.split('---')
         
         for section in sections:
@@ -209,9 +246,8 @@ Text to analyze:
                     })
         
         return exclusions
-    
     except Exception as e:
-        print(f"   ⚠️ AI detection failed: {e}")
+        print(f"   ⚠️ Error parsing AI response: {e}")
         return []
 
 
@@ -237,15 +273,21 @@ def slugify(text):
 
 def normalize_author_name(name):
     name = name.lower().replace('.', '').replace('-', ' ').replace('_', ' ').strip()
-    tokens = [t for t in name.split() if t not in {"friedrich", "wilhelm", "george", "william", "joseph", "st", "saint"}]
+    # PRESERVE FULL NAME: Do not strip first names.
+    # tokens = [t for t in name.split() if t not in {"friedrich", "wilhelm", "george", "william", "joseph", "st", "saint"}]
+    tokens = name.split()
+    
     if "nietzsche" in tokens:
         return "nietzsche"
     if "plato" in tokens:
         return "plato"
     if "epictetus" in tokens:
         return "epictetus"
-    if "marcus" in tokens or "aurelius" in tokens:
+    if "marcus" in tokens and "aurelius" in tokens:
         return "marcus-aurelius"
+    if "ken" in tokens and "tsugi" in tokens:
+        return "ken tsugi"
+    
     return "-".join(tokens) or "unknown"
 
 
@@ -267,6 +309,29 @@ def load_existing_manifest(slug):
             return None
 
     return None
+
+
+def load_existing_assets(slug):
+    """Load all files from an existing CODEX zip into an assets dict (excluding codex.json)."""
+    zip_path = os.path.join(CODEX_DIR, f"{slug}.codex")
+    assets = {}
+    
+    if os.path.exists(zip_path):
+        try:
+            with zipfile.ZipFile(zip_path, "r") as zf:
+                for name in zf.namelist():
+                    if name == "codex.json":
+                        continue
+                    # FILTER: Only load raw sources, skip legacy clean files
+                    if "-clean-" in name:
+                        continue
+                        
+                    with zf.open(name) as f:
+                        assets[name] = f.read().decode("utf-8")
+        except Exception as e:
+            print(f"   ⚠️ Warning: Failed to load existing assets from {slug}.codex: {e}")
+            
+    return assets
 
 
 def bump_version(existing_version):
@@ -352,12 +417,47 @@ def upsert_source(manifest, source):
     manifest["sources"] = existing
 
 
-def emit_codex_for_author(display_name, slug, entries):
+def emit_codex_for_author(display_name, slug, entries, system_prompt=None):
     """Build and write a CODEX manifest for an author from curated entries."""
     existing = load_existing_manifest(slug)
     manifest = ensure_manifest_base(display_name, existing)
 
-    assets = {}
+    # FILTER: Remove legacy "curated" sources from manifest
+    if "sources" in manifest:
+        manifest["sources"] = [
+            s for s in manifest["sources"] 
+            if "clean" not in s.get("id", "") and "curated" not in s.get("type", "")
+        ]
+
+    # Inject system prompt if provided
+    if system_prompt:
+        manifest.setdefault("instructions", {})["system_prompt_hint"] = system_prompt
+
+    # Inject Curation Recipes (Auditability)
+    manifest["recipes"] = [
+        {
+            "id": "gutenberg-regex-v1",
+            "type": "regex",
+            "description": "Standard Project Gutenberg header/footer removal",
+            "active": True
+        },
+        {
+            "id": "structure-cleaner-v1",
+            "type": "heuristic",
+            "description": "Removal of dense footnote blocks and endnotes",
+            "active": True
+        },
+        {
+            "id": "ai-meta-filter-v1",
+            "type": "ai-filter",
+            "description": "LLM-based detection of translator notes and introductions",
+            "model": MODEL_NAME,
+            "active": True
+        }
+    ]
+
+    # Load existing assets to preserve previous books
+    assets = load_existing_assets(slug)
     now = datetime.utcnow().isoformat() + "Z"
 
     for idx, entry in enumerate(entries, 1):
@@ -372,18 +472,16 @@ def emit_codex_for_author(display_name, slug, entries):
             curated_text = f.read()
 
         raw_hash = sha256_of_text(raw_text)
-        curated_hash = sha256_of_text(curated_text)
 
         # Raw source entry
         raw_id = f"{slug}-raw-{idx}"
         raw_source = {
             "id": raw_id,
-            "uri": raw_path,
+            "uri": f"sources/{raw_id}.txt",
             "type": "text/plain",
             "hash": f"sha256:{raw_hash}",
             "size_bytes": len(raw_text.encode("utf-8")),
             "encoding": "utf-8",
-            "content": raw_text,
             "curation": {
                 "exclusions": metadata.get("exclusions", []),
                 "model": metadata.get("model"),
@@ -393,27 +491,10 @@ def emit_codex_for_author(display_name, slug, entries):
             "author": metadata.get("author"),
         }
 
-        # Curated source entry
-        clean_id = f"{slug}-clean-{idx}"
-        clean_source = {
-            "id": clean_id,
-            "uri": curated_path,
-            "type": "text/plain+curated",
-            "hash": f"sha256:{curated_hash}",
-            "size_bytes": len(curated_text.encode("utf-8")),
-            "encoding": "utf-8",
-            "content": curated_text,
-            "derived_from": raw_id,
-            "title": metadata.get("title"),
-            "author": metadata.get("author"),
-        }
-
         upsert_source(manifest, raw_source)
-        upsert_source(manifest, clean_source)
 
         # Bundle assets into the dense zip
         assets[f"sources/{raw_id}.txt"] = raw_text
-        assets[f"sources/{clean_id}.txt"] = curated_text
 
     manifest.setdefault("history", []).append({
         "version": manifest.get("meta", {}).get("version"),
@@ -479,13 +560,20 @@ def process_book(filepath):
     curated_path = os.path.join(CURATED_DIR, filename)
     
     # Check if already processed
+    metadata = None
     if os.path.exists(metadata_path):
         print(f"\n📘 {filename}")
         print(f"   ✅ Metadata already exists (v3), reusing")
-        with open(metadata_path, 'r', encoding='utf-8') as f:
-            metadata = json.load(f)
-    else:
+        try:
+            with open(metadata_path, 'r', encoding='utf-8') as f:
+                metadata = json.load(f)
+        except Exception:
+            print("   ⚠️ Metadata file corrupted, re-processing.")
+            metadata = None
+
+    if metadata is None:
         print(f"\n📘 Processing: {filename}")
+
 
         with open(filepath, 'r', encoding='utf-8') as f:
             raw_text = f.read()
@@ -537,11 +625,23 @@ def process_book(filepath):
         author_chars = len(raw_text) - excluded_chars
         author_percentage = (author_chars / len(raw_text)) * 100 if len(raw_text) > 0 else 0
 
-        metadata['stats'] = {
+        metadata = {
+            "filename": filename,
+            "author": author,
+            "title": os.path.splitext(filename)[0],
+            "version": "3.0-exclusions",
             "total_chars": len(raw_text),
-            "excluded_chars": excluded_chars,
-            "author_chars": author_chars,
-            "author_percentage": round(author_percentage, 2)
+            "exclusions": merged_exclusions,
+            "curated_by": "auto_curator v3.0 (exclusion-based)",
+            "model": MODEL_NAME,
+            "timestamp": datetime.utcnow().isoformat() + "Z",
+            "notes": "This uses exclusion-based curation. All text EXCEPT exclusions is author text.",
+            "stats": {
+                "total_chars": len(raw_text),
+                "excluded_chars": excluded_chars,
+                "author_chars": author_chars,
+                "author_percentage": round(author_percentage, 2)
+            }
         }
 
         # Save metadata
@@ -565,6 +665,64 @@ def process_book(filepath):
     metadata["curated_path"] = curated_path
     metadata["raw_path"] = filepath
     return metadata
+
+def explode_codex(codex_path):
+    """
+    Hydrate a CODEX file: Extract raw text, apply exclusions, and write clean text to curated/.
+    This is the "Explosion" or "Unpaxing" step in the CODEX Lifecycle.
+    """
+    print(f"💥 Exploding (Hydrating) {os.path.basename(codex_path)}...")
+    
+    try:
+        with zipfile.ZipFile(codex_path, "r") as zf:
+            # 1. Load Manifest
+            with zf.open("codex.json") as f:
+                manifest = json.loads(f.read().decode("utf-8"))
+            
+            # 2. Process Sources
+            for source in manifest.get("sources", []):
+                uri = source.get("uri")
+                if not uri:
+                    continue
+                
+                # Check if it's a raw source (we only care about hydrating raw sources)
+                # In the new format, we only store raw sources.
+                
+                try:
+                    # Read Raw Text from Zip
+                    with zf.open(uri) as f:
+                        raw_text = f.read().decode("utf-8")
+                    
+                    # Get Exclusions
+                    exclusions = source.get("curation", {}).get("exclusions", [])
+                    
+                    # Apply Exclusions (The Recipe)
+                    clean_text = apply_exclusions(raw_text, exclusions)
+                    
+                    # Determine Output Filename
+                    # We try to reconstruct the original filename or use the title
+                    title = source.get("title", "Unknown Title")
+                    author = source.get("author", "Unknown Author")
+                    # Sanitize filename
+                    safe_title = re.sub(r'[<>:"/\\|?*]', '', title)
+                    safe_author = re.sub(r'[<>:"/\\|?*]', '', author)
+                    out_filename = f"{safe_title} by {safe_author}.txt"
+                    
+                    out_path = os.path.join(CURATED_DIR, out_filename)
+                    
+                    # Write Clean Text
+                    with open(out_path, "w", encoding="utf-8") as f:
+                        f.write(clean_text)
+                        
+                    print(f"   ✨ Hydrated: {out_filename}")
+                    
+                except KeyError:
+                    print(f"   ⚠️ Could not find {uri} in archive.")
+                except Exception as e:
+                    print(f"   ⚠️ Failed to hydrate source {uri}: {e}")
+                    
+    except Exception as e:
+        print(f"   ❌ Failed to explode {codex_path}: {e}")
 
 def main():
     """Process all txt files or a specific file if provided."""
@@ -604,4 +762,6 @@ def main():
         emit_codex_for_author(display, slug, bundle.get("items", []))
 
 if __name__ == "__main__":
+    if not check_ollama_connection():
+        sys.exit(1)
     main()

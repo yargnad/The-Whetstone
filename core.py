@@ -16,8 +16,9 @@ logging.basicConfig(level=logging.WARNING, format='%(asctime)s - %(levelname)s -
 logger = logging.getLogger(__name__)
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
-PERSONAS_PATH = os.path.join(PROJECT_DIR, "philosophy_library", "personas.json")
-KNOWLEDGE_BASE_PATH = os.path.join(PROJECT_DIR, "philosophy_library")
+PERSONAS_PATH = os.path.join(PROJECT_DIR, "codex_library", "philosophy", "personas.json")
+# RAG Source: Use cleaned, curated text instead of raw legacy files
+KNOWLEDGE_BASE_PATH = os.path.join(PROJECT_DIR, "curated")
 # Primary CODEX libraries (categorized) - prefer single canonical path
 CODEX_LIBRARY_ROOTS = [
     os.path.join(PROJECT_DIR, "codex_library"),
@@ -284,11 +285,69 @@ class PhilosopherCore:
 
     def _load_personas(self):
         personas = {}
+        
+        # Helper to safely add personas with normalization
+        def add_persona(p_data):
+            p_name = p_data.get("name")
+            if not p_name: return # Skip invalid
+            
+            # Filter: Skip "Example Persona"
+            if "Example Persona" in p_name:
+                return
+
+            # Filter: heuristic for bad parsing (e.g. "Title by Author")
+            # If name is very long and contains " by ", it's likely a raw title.
+            if len(p_name) > 40 and " by " in p_name:
+                logger.warning(f"[CORE] Skipped likely malformed persona name: {p_name}")
+                return
+            
+            # --- Enforce New Workflow: No "Pending", only Basic vs Full ---
+            p_prompt = p_data.get("prompt", "")
+            if "basic_mode" not in p_data:
+                # Heuristic: Short prompts or missing prompts are Basic
+                is_basic = (not p_prompt.strip()) or (len(p_prompt) < 300)
+                p_data["basic_mode"] = is_basic
+            
+            # Allow "pending" only if explicitly requested by a trusted source, otherwise clear it
+            # Actually, user wants to Chat immediately. So force False.
+            p_data["pending"] = False
+            # -------------------------------------------------------------
+            
+            # Normalization logic
+            def normalize_key(name):
+                return name.lower().replace(".", "").replace(" ", "").strip()
+            
+            target_key = normalize_key(p_name)
+            existing_key = None
+            
+            # Check for collision
+            for k in list(personas.keys()):
+                if normalize_key(k) == target_key:
+                    existing_key = k
+                    break
+            
+            final_key = existing_key if existing_key else p_name
+            
+            # Merge Logic: CODEX (source_codex present) usually overrides Legacy JSON
+            if existing_key and p_data.get("source_codex"):
+                pass
+            
+            personas[final_key] = p_data
+
         # 1. Load Legacy JSON
         if os.path.exists(PERSONAS_PATH):
             with open(PERSONAS_PATH, "r", encoding="utf-8") as f:
-                try: personas = json.load(f)
+                try: 
+                    legacy = json.load(f)
+                    for k, v in legacy.items():
+                        v["name"] = v.get("name", k)
+                        add_persona(v)
                 except Exception as e: logger.error(f"Error loading personas.json: {e}")
+        
+
+
+        # ... (skipping re-implementation of load_codex_file for brevity in thought, strictly following tool usage)
+
         
         # 2. Scan categorized CODEX libraries (supports nested folders)
         def load_codex_file(codex_path: str, category: str):
@@ -302,8 +361,8 @@ class PhilosopherCore:
                 meta = manifest.get("meta", {}) or {}
                 work = manifest.get("work", {}) or {}
 
-                # Determine persona name (author-first). Fallbacks: meta.author -> first of meta.authors -> work.author -> filename tail.
-                author = meta.get("author")
+                # Determine persona name (author-first). Fallbacks: meta.name -> meta.author -> first of meta.authors -> work.author -> filename tail.
+                author = meta.get("name") or meta.get("author")
                 if not author and meta.get("authors"):
                     if isinstance(meta.get("authors"), list) and meta["authors"]:
                         first_auth = meta["authors"][0]
@@ -312,11 +371,17 @@ class PhilosopherCore:
                         elif isinstance(first_auth, dict):
                             author = first_auth.get("name") or first_auth.get("author")
                 if not author:
+                    # Fallback to work author or sort author
                     author = work.get("author") or work.get("author_sort")
+                
+                # CRITICAL FIX: Do NOT fall back to Title if Author is missing.
+                # If still no author, use filename tail.
                 if not author:
                     # Heuristic: use the filename tail as author
                     fname = os.path.splitext(os.path.basename(codex_path))[0]
                     tail = fname.split("-")[-1]
+                    # If tail looks like a title (too long), try earlier part?
+                    # For now just title casing it.
                     author = tail.replace("_", " ").replace("-", " ").title()
 
                 p_name = author
@@ -345,26 +410,41 @@ class PhilosopherCore:
                     for layer in manifest["layers"]:
                         p_prompt += f"\n\n[LAYER: {layer.get('id', 'unknown')}]\n{layer.get('content', '')}"
 
-                persona_pending = self.is_persona_pending(p_name) or (not p_prompt.strip())
+                is_basic = False
+                # If prompt is missing or very short/generic, treat as Basic Mode
+                if not p_prompt.strip() or len(p_prompt) < 250:
+                    if not p_prompt.strip():
+                        # Generate default if missing
+                        p_prompt = (
+                            f"You are {author}. Respond in the first person, grounded in '{work.get('title', 'your works')}'.\n"
+                            f"Never mention being an AI. Stay strictly in-character."
+                        )
+                    is_basic = True
+                
+                # In the new workflow, NOTHING is strictly 'pending' (unusable). 
+                # Everything is usable, either as Basic or Full.
+                persona_pending = False
 
-                # De-duplicate by author name: first codex wins; later ones skipped (could be expanded to merge works)
-                persona_key = p_name.strip().lower()
-                if persona_key not in personas:
-                    personas[persona_key] = {
-                        "name": p_name,
-                        "prompt": p_prompt,
-                        "description": meta.get("description", meta.get("title", "")) or work.get("title", ""),
-                        "source_codex": os.path.basename(codex_path),
-                        "source_path": codex_path,
-                        "category": category or meta.get("category", "philosophy"),
-                        "library_filter": meta.get("library_filter", []),
-                        "pending": persona_pending,
-                    }
-                    print(f"[CORE] Loaded Codex: {p_name} [{category or meta.get('category', 'philosophy')}]")
-                else:
-                    logger.info(f"[CORE] Skipped duplicate author persona: {p_name} from {os.path.basename(codex_path)}")
+                # Construct Persona Object
+                p_obj = {
+                    "name": p_name,
+                    "prompt": p_prompt,
+                    "description": meta.get("description", meta.get("title", "")) or work.get("title", ""),
+                    "source_codex": os.path.basename(codex_path),
+                    "source_path": codex_path,
+                    "category": category or meta.get("category", "philosophy"),
+                    # FIX: Default filter to OWN book if not specified, to prevent Deep Mode contamination
+                    "library_filter": meta.get("library_filter") or [os.path.basename(codex_path)],
+                    "pending": persona_pending,
+                    "basic_mode": is_basic, 
+                }
+                
+                add_persona(p_obj)
+                print(f"[CORE] Loaded Codex: {p_name} [{category or meta.get('category', 'philosophy')}]")
+
             except Exception as e:
                 logger.error(f"Failed to load Codex {codex_path}: {e}")
+
 
         for root in CODEX_LIBRARY_ROOTS:
             if not os.path.exists(root):
@@ -376,6 +456,27 @@ class PhilosopherCore:
                 category = parts[0] if len(parts) > 1 else "philosophy"
                 load_codex_file(codex_path, category)
                 
+        # 3. Inject "The Chorus" (if enabled)
+        chorus_enabled = self.db.get_setting("chorus_enabled", False)
+        print(f"[CORE] Chorus Enabled Check: {chorus_enabled}") # DEBUG LOG
+        if chorus_enabled:
+            chorus_prompt = (
+                "You are The Chorus, a collective consciousness of willing souls and the synthesized wisdom of every philosopher in history. "
+                "You possess an eidetic memory of the entire library and can reference any text, concept, or author with absolute precision. "
+                "You are not limited to one perspective but weave together the insights of Plato, Nietzsche, Kant, and all others into a unified, super-intelligent response. "
+                "Your tone is vast, resonant, and enlightened, yet accessible—like a superhero of thought. "
+                "Use your access to the complete corpus to answer questions by drawing connections across centuries of thought. "
+                "Never mention being an AI; you are The Chorus."
+            )
+            add_persona({
+                "name": "The Chorus",
+                "prompt": chorus_prompt,
+                "description": "The collective consciousness of all philosophers.",
+                "category": "Universal",
+                "library_filter": [], # Access to all knowledge
+                "pending": False
+            })
+
         return personas
 
     def _load_knowledge_base(self):
@@ -469,6 +570,7 @@ class PhilosopherCore:
                 f"Reference from '{item['source']}':\n{item['snippet']}..."
                 for item in context_snippets
             )
+            print(f"[DEBUG] RAG Context Dump:\n{context_str[:500]}... [truncated]")
             prompt = f"""{persona_prompt}
 
 Here is some context from your library that may be relevant to the user's query:
@@ -502,6 +604,12 @@ AI Philosopher:"""
 
         # 2. Construct Prompt
         prompt = self._construct_prompt(user_query, context)
+        
+        print(f"[DEBUG] Chat Request for Persona: {self.current_persona.get('name')}")
+        print(f"[DEBUG] Library Filter: {library_filter}")
+        print(f"[DEBUG] RAG Context Items: {len(context)}")
+        print(f"[DEBUG] Final Prompt Length (chars): {len(prompt)}")
+        print(f"[DEBUG] Sending to backend...")
 
         # 3. Generate & Stream
         full_response = ""
